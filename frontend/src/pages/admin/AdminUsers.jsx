@@ -381,7 +381,7 @@ export default function AdminUsers() {
         <div>
           <h2 className="text-2xl font-bold">Users</h2>
           <p className="text-muted-foreground">
-            View and manage Firebase authenticated users
+            View and manage registered users
           </p>
         </div>
         <Card>
@@ -408,7 +408,7 @@ export default function AdminUsers() {
         <div>
           <h2 className="text-2xl font-bold">Users</h2>
           <p className="text-muted-foreground">
-            View and manage Firebase authenticated users
+            View and manage registered users
           </p>
         </div>
         <Button
@@ -1109,7 +1109,7 @@ export default function AdminUsers() {
                 {userToDelete?.displayName || userToDelete?.email}
               </span>
               ? This action cannot be undone and will permanently remove the user
-              from Firebase Authentication.
+              from the database.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
