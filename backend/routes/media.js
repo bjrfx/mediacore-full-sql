@@ -391,7 +391,7 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     const finalContentGroupId = contentGroupId || `cg_${Date.now()}_${uuidv4().substring(0, 8)}`;
     
     // Construct file path and URL
-    const relativePath = `/public/uploads/${type}/${file.filename}`;
+    const relativePath = `/home/masakali/mediacoreapi-sql.masakalirestrobar.ca/backend/storage/media${type}/${file.filename}`;
     const fileUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
     
     // Get file size and duration from file if available
