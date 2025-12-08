@@ -467,6 +467,41 @@ export const adminApi = {
     return response.data;
   },
 
+  // Click Stream - Real-time request logs
+  getClickStream: async (limit = 50, offset = 0) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/admin/analytics/click-stream?limit=${limit}&offset=${offset}`, { headers });
+    return response.data;
+  },
+
+  // Geographic analytics
+  getGeographicStats: async (days = 30) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/admin/analytics/geographic?days=${days}`, { headers });
+    return response.data;
+  },
+
+  // Device/Browser analytics
+  getDeviceStats: async (days = 30) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/admin/analytics/devices?days=${days}`, { headers });
+    return response.data;
+  },
+
+  // Referrer analytics
+  getReferrerStats: async (days = 30) => {
+    const headers = await getAuthHeaders();
+    const response = await api.get(`/admin/analytics/referrers?days=${days}`, { headers });
+    return response.data;
+  },
+
+  // Hourly breakdown
+  getHourlyStats: async () => {
+    const headers = await getAuthHeaders();
+    const response = await api.get('/admin/analytics/hourly', { headers });
+    return response.data;
+  },
+
   // ---- User Management ----
 
   // Get all users

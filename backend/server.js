@@ -467,6 +467,210 @@ app.get('/admin/analytics/realtime', checkAdminAuth, async (req, res) => {
   }
 });
 
+// Click Stream - Real-time request log
+app.get('/admin/analytics/click-stream', checkAdminAuth, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    
+    const logs = await db.query(`
+      SELECT 
+        rl.id,
+        rl.timestamp,
+        rl.endpoint,
+        rl.path,
+        rl.method,
+        rl.status_code as statusCode,
+        rl.response_time as responseTime,
+        rl.ip_address as ipAddress,
+        rl.country,
+        rl.city,
+        rl.browser,
+        rl.browser_version as browserVersion,
+        rl.os,
+        rl.device_type as deviceType,
+        rl.referer,
+        ak.name as apiKeyName
+      FROM request_logs rl
+      LEFT JOIN api_keys ak ON rl.api_key_id = ak.id
+      ORDER BY rl.timestamp DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+    
+    const totalCount = await db.queryOne('SELECT COUNT(*) as count FROM request_logs');
+    
+    res.json({ 
+      success: true, 
+      data: logs,
+      total: totalCount?.count || 0,
+      limit,
+      offset
+    });
+  } catch (error) {
+    console.error('Error fetching click stream:', error);
+    res.status(500).json({ success: false, message: 'Error fetching click stream' });
+  }
+});
+
+// Geographic analytics
+app.get('/admin/analytics/geographic', checkAdminAuth, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    
+    // Top countries
+    const topCountries = await db.query(`
+      SELECT 
+        COALESCE(country, 'Unknown') as country,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY country
+      ORDER BY requests DESC
+      LIMIT 10
+    `, [days]);
+    
+    // Top cities
+    const topCities = await db.query(`
+      SELECT 
+        COALESCE(city, 'Unknown') as city,
+        COALESCE(country, 'Unknown') as country,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY city, country
+      ORDER BY requests DESC
+      LIMIT 10
+    `, [days]);
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        topCountries: topCountries.map(r => ({ country: r.country, requests: r.requests })),
+        topCities: topCities.map(r => ({ city: r.city, country: r.country, requests: r.requests }))
+      } 
+    });
+  } catch (error) {
+    console.error('Error fetching geographic data:', error);
+    res.status(500).json({ success: false, message: 'Error fetching geographic data' });
+  }
+});
+
+// Browser & OS analytics
+app.get('/admin/analytics/devices', checkAdminAuth, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    
+    // Top browsers
+    const topBrowsers = await db.query(`
+      SELECT 
+        COALESCE(browser, 'Unknown') as browser,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY browser
+      ORDER BY requests DESC
+      LIMIT 10
+    `, [days]);
+    
+    // Top OS
+    const topOS = await db.query(`
+      SELECT 
+        COALESCE(os, 'Unknown') as os,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY os
+      ORDER BY requests DESC
+      LIMIT 10
+    `, [days]);
+    
+    // Device types
+    const deviceTypes = await db.query(`
+      SELECT 
+        COALESCE(device_type, 'Unknown') as deviceType,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY device_type
+      ORDER BY requests DESC
+    `, [days]);
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        topBrowsers: topBrowsers.map(r => ({ browser: r.browser, requests: r.requests })),
+        topOS: topOS.map(r => ({ os: r.os, requests: r.requests })),
+        deviceTypes: deviceTypes.map(r => ({ deviceType: r.deviceType, requests: r.requests }))
+      } 
+    });
+  } catch (error) {
+    console.error('Error fetching device data:', error);
+    res.status(500).json({ success: false, message: 'Error fetching device data' });
+  }
+});
+
+// Top referrers analytics
+app.get('/admin/analytics/referrers', checkAdminAuth, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    
+    const topReferrers = await db.query(`
+      SELECT 
+        CASE 
+          WHEN referer IS NULL OR referer = '' THEN 'Direct'
+          ELSE SUBSTRING_INDEX(SUBSTRING_INDEX(referer, '://', -1), '/', 1)
+        END as referrer,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY referrer
+      ORDER BY requests DESC
+      LIMIT 10
+    `, [days]);
+    
+    res.json({ 
+      success: true, 
+      data: topReferrers.map(r => ({ referrer: r.referrer, requests: r.requests }))
+    });
+  } catch (error) {
+    console.error('Error fetching referrer data:', error);
+    res.status(500).json({ success: false, message: 'Error fetching referrer data' });
+  }
+});
+
+// Hourly breakdown for today
+app.get('/admin/analytics/hourly', checkAdminAuth, async (req, res) => {
+  try {
+    const hourlyData = await db.query(`
+      SELECT 
+        HOUR(timestamp) as hour,
+        COUNT(*) as requests,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful
+      FROM request_logs
+      WHERE DATE(timestamp) = CURDATE()
+      GROUP BY HOUR(timestamp)
+      ORDER BY hour ASC
+    `);
+    
+    // Fill in missing hours
+    const fullHourlyData = [];
+    for (let i = 0; i < 24; i++) {
+      const found = hourlyData.find(h => h.hour === i);
+      fullHourlyData.push({
+        hour: i,
+        label: `${i.toString().padStart(2, '0')}:00`,
+        requests: found?.requests || 0,
+        successful: found?.successful || 0
+      });
+    }
+    
+    res.json({ success: true, data: fullHourlyData });
+  } catch (error) {
+    console.error('Error fetching hourly data:', error);
+    res.status(500).json({ success: false, message: 'Error fetching hourly data' });
+  }
+});
+
 // Additional admin endpoints
 app.get('/admin/users/:uid', checkAdminAuth, async (req, res) => {
   try {

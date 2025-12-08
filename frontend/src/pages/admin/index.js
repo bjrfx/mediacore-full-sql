@@ -4,5 +4,6 @@ export { default as AdminMedia } from './AdminMedia';
 export { default as AdminUpload } from './AdminUpload';
 export { default as AdminApiKeys } from './AdminApiKeys';
 export { default as AdminAnalytics } from './AdminAnalytics';
+export { default as AdminClickStream } from './AdminClickStream';
 export { default as AdminUsers } from './AdminUsers';
 export { default as AdminSettings } from './AdminSettings';

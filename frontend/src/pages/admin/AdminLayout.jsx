@@ -11,6 +11,7 @@ import {
   ArrowLeft,
   Users,
   Music,
+  Activity,
 } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { Button } from '../../components/ui/button';
@@ -24,6 +25,7 @@ const adminNavItems = [
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Key, label: 'API Keys', path: '/admin/api-keys' },
   { icon: BarChart3, label: 'Analytics', path: '/admin/analytics' },
+  { icon: Activity, label: 'Click Stream', path: '/admin/click-stream' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 

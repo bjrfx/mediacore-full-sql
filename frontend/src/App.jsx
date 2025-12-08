@@ -42,6 +42,7 @@ const AdminMedia = lazy(() => import('./pages/admin/AdminMedia'));
 const AdminUpload = lazy(() => import('./pages/admin/AdminUpload'));
 const AdminApiKeys = lazy(() => import('./pages/admin/AdminApiKeys'));
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'));
+const AdminClickStream = lazy(() => import('./pages/admin/AdminClickStream'));
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminArtists = lazy(() => import('./pages/admin/AdminArtists'));
@@ -124,6 +125,7 @@ function AppRoutes() {
             <Route path="artists/:artistId" element={<AdminArtistDetail />} />
             <Route path="api-keys" element={<AdminApiKeys />} />
             <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="click-stream" element={<AdminClickStream />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>
