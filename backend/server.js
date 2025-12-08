@@ -206,7 +206,23 @@ app.get('/admin/users/online', checkAdminAuth, async (req, res) => {
 app.get('/admin/api-keys', checkAdminAuth, async (req, res) => {
   try {
     const keys = await db.query('SELECT * FROM api_keys WHERE is_active = 1');
-    res.json({ success: true, count: keys.length, data: keys });
+    // Transform to camelCase and parse JSON fields
+    const transformedKeys = keys.map(key => ({
+      id: key.id,
+      name: key.name,
+      apiKey: key.api_key,
+      keyPreview: key.api_key ? `${key.api_key.substring(0, 10)}...${key.api_key.slice(-4)}` : '',
+      accessType: key.access_type,
+      permissions: key.permissions ? (typeof key.permissions === 'string' ? JSON.parse(key.permissions) : key.permissions) : [],
+      isActive: key.is_active === 1,
+      createdAt: key.created_at,
+      createdBy: key.created_by,
+      createdByEmail: key.created_by_email,
+      lastUsedAt: key.last_used_at,
+      usageCount: key.usage_count || 0,
+      expiresAt: key.expires_at,
+    }));
+    res.json({ success: true, count: transformedKeys.length, data: transformedKeys });
   } catch (error) {
     console.error('Error fetching API keys:', error);
     res.status(500).json({ success: false, message: 'Error fetching API keys' });
