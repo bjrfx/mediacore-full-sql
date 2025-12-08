@@ -1,0 +1,241 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 141 76% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 141 76% 42%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@layer components {
+  .glass-effect {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10;
+  }
+
+  .gradient-mask {
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-green-400;
+  }
+
+  .hover-scale {
+    @apply transition-transform duration-200 hover:scale-105;
+  }
+
+  .hover-brightness {
+    @apply transition-all duration-200 hover:brightness-110;
+  }
+
+  .media-card {
+    @apply relative rounded-lg overflow-hidden bg-card p-4 transition-all duration-300 hover:bg-secondary cursor-pointer;
+  }
+
+  .media-card-image {
+    @apply aspect-square rounded-md overflow-hidden mb-4 relative;
+  }
+
+  .play-button-overlay {
+    @apply absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-300;
+  }
+
+  .media-card:hover .play-button-overlay {
+    @apply opacity-100;
+  }
+
+  .sidebar-item {
+    @apply flex items-center gap-4 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer;
+  }
+
+  .sidebar-item.active {
+    @apply text-foreground bg-secondary;
+  }
+
+  .mini-player {
+    @apply fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-r from-[#181818] to-[#282828] border-t border-border z-50;
+  }
+
+  .progress-bar {
+    @apply h-1 bg-muted rounded-full overflow-hidden cursor-pointer group;
+  }
+
+  .progress-bar-fill {
+    @apply h-full bg-primary transition-all duration-100 group-hover:bg-green-400;
+  }
+
+  .volume-slider {
+    @apply w-24 h-1 bg-muted rounded-full cursor-pointer;
+  }
+
+  .input-search {
+    @apply w-full bg-secondary border-none rounded-full px-6 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold hover:scale-105 hover:brightness-110 transition-all duration-200;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-foreground px-6 py-2 rounded-full font-semibold hover:bg-accent transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply text-muted-foreground hover:text-foreground transition-colors duration-200;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:shadow-black/20 hover:-translate-y-1;
+  }
+
+  .animate-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Audio visualizer animation */
+  .audio-bar {
+    @apply w-1 bg-primary rounded-full;
+    animation: audio-wave 1s ease-in-out infinite;
+  }
+
+  .audio-bar:nth-child(1) { animation-delay: 0s; }
+  .audio-bar:nth-child(2) { animation-delay: 0.1s; }
+  .audio-bar:nth-child(3) { animation-delay: 0.2s; }
+  .audio-bar:nth-child(4) { animation-delay: 0.3s; }
+
+  @keyframes audio-wave {
+    0%, 100% { height: 8px; }
+    50% { height: 24px; }
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-secondary animate-pulse rounded;
+  }
+
+  /* Toast notifications */
+  .toast {
+    @apply fixed bottom-24 left-1/2 -translate-x-1/2 bg-foreground text-background px-6 py-3 rounded-full shadow-lg z-[100];
+  }
+}
+
+@layer utilities {
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-inset-top {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Radix Dialog fix - ensure proper centering */
+[data-radix-popper-content-wrapper] {
+  z-index: 50 !important;
+}
+
+/* Ensure dialog portal is centered properly */
+[role="dialog"] {
+  position: fixed !important;
+}
+
+/* React Player Customization */
+.react-player-wrapper {
+  position: relative;
+  padding-top: 56.25%; /* 16:9 Aspect Ratio */
+}
+
+.react-player-wrapper > div {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Prevent text selection during drag */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Mobile tap highlight removal */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Focus visible for accessibility */
+.focus-visible:focus {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+}

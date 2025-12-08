@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://mediacore.masakalirestrobar.ca/sitemap.xml
