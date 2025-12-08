@@ -232,10 +232,40 @@ app.get('/admin/api-keys', checkAdminAuth, async (req, res) => {
 app.post('/admin/generate-key', checkAdminAuth, async (req, res) => {
   try {
     const crypto = require('crypto');
+    const { v4: uuidv4 } = require('uuid');
+    const id = uuidv4();
     const apiKey = 'mc_' + crypto.randomBytes(32).toString('hex');
-    const { name, accessType = 'read_only' } = req.body;
-    await db.query('INSERT INTO api_keys (api_key, name, access_type, created_by, created_at) VALUES (?, ?, ?, ?, NOW())', [apiKey, name || 'New Key', accessType, req.user.uid]);
-    res.status(201).json({ success: true, data: { apiKey, name } });
+    const { name, accessType = 'read_only', expiresInDays } = req.body;
+    
+    // Calculate expiry date if provided
+    let expiresAt = null;
+    if (expiresInDays && expiresInDays > 0) {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + parseInt(expiresInDays));
+      expiresAt = expiry.toISOString().slice(0, 19).replace('T', ' ');
+    }
+    
+    // Set permissions based on access type
+    const permissions = accessType === 'full_access' 
+      ? JSON.stringify(['read:media', 'write:media', 'read:artists', 'write:artists', 'read:albums', 'write:albums', 'admin'])
+      : JSON.stringify(['read:media', 'read:artists', 'read:albums']);
+    
+    await db.query(
+      'INSERT INTO api_keys (id, api_key, name, access_type, permissions, created_by, created_by_email, created_at, expires_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 1)',
+      [id, apiKey, name || 'New Key', accessType, permissions, req.user.uid, req.user.email, expiresAt]
+    );
+    
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        id,
+        apiKey, 
+        name,
+        accessType,
+        permissions: JSON.parse(permissions),
+        expiresAt
+      } 
+    });
   } catch (error) {
     console.error('Error generating API key:', error);
     res.status(500).json({ success: false, message: 'Error generating key' });
@@ -359,8 +389,18 @@ app.put('/admin/users/:uid/subscription', checkAdminAuth, async (req, res) => {
 
 app.delete('/admin/api-keys/:id', checkAdminAuth, async (req, res) => {
   try {
-    await db.query('UPDATE api_keys SET is_active = 0 WHERE id = ?', [req.params.id]);
-    res.json({ success: true, message: 'API key deleted' });
+    const { id } = req.params;
+    const { hardDelete } = req.query;
+    
+    if (hardDelete === 'true') {
+      // Permanently delete the key
+      await db.query('DELETE FROM api_keys WHERE id = ?', [id]);
+      res.json({ success: true, message: 'API key permanently deleted' });
+    } else {
+      // Soft delete - just deactivate
+      await db.query('UPDATE api_keys SET is_active = 0 WHERE id = ?', [id]);
+      res.json({ success: true, message: 'API key deactivated' });
+    }
   } catch (error) {
     console.error('Error deleting API key:', error);
     res.status(500).json({ success: false, message: 'Error deleting key' });

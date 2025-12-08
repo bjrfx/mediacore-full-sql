@@ -58,6 +58,12 @@ export default function AdminApiKeys() {
     expiresInDays: 365,
   });
   const [copiedKey, setCopiedKey] = useState(null);
+  
+  // Delete confirmation state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
+  const [deleteHard, setDeleteHard] = useState(false);
 
   // Fetch API keys
   const { data, isLoading, error } = useQuery({
@@ -127,12 +133,29 @@ export default function AdminApiKeys() {
   };
 
   const handleDeleteKey = (key, hardDelete = false) => {
-    if (
-      window.confirm(
-        `${hardDelete ? 'Permanently delete' : 'Deactivate'} API key "${key.name}"?`
-      )
-    ) {
-      deleteMutation.mutate({ id: key.id, hardDelete });
+    setDeleteTarget(key);
+    setDeleteHard(hardDelete);
+    setDeleteConfirmName('');
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteKey = () => {
+    if (deleteConfirmName !== deleteTarget?.name) {
+      addToast({ message: 'Key name does not match', type: 'error' });
+      return;
+    }
+    deleteMutation.mutate({ id: deleteTarget.id, hardDelete: deleteHard });
+    setShowDeleteDialog(false);
+    setDeleteTarget(null);
+    setDeleteConfirmName('');
+  };
+
+  const handleCopyKeyName = async (name) => {
+    try {
+      await navigator.clipboard.writeText(name);
+      addToast({ message: 'Key name copied to clipboard', type: 'success' });
+    } catch (error) {
+      addToast({ message: 'Failed to copy', type: 'error' });
     }
   };
 
@@ -407,15 +430,15 @@ export default function AdminApiKeys() {
           </DialogHeader>
           <div className="py-4">
             <div className="bg-muted p-4 rounded-lg font-mono text-sm break-all">
-              {newKeyData?.key}
+              {newKeyData?.apiKey || newKeyData?.key}
             </div>
           </div>
           <DialogFooter>
             <Button
-              onClick={() => handleCopyKey(newKeyData?.key)}
+              onClick={() => handleCopyKey(newKeyData?.apiKey || newKeyData?.key)}
               className="w-full"
             >
-              {copiedKey === newKeyData?.key ? (
+              {copiedKey === (newKeyData?.apiKey || newKeyData?.key) ? (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Copied!
@@ -426,6 +449,74 @@ export default function AdminApiKeys() {
                   Copy to Clipboard
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open);
+        if (!open) {
+          setDeleteTarget(null);
+          setDeleteConfirmName('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              {deleteHard ? 'Permanently Delete' : 'Deactivate'} API Key
+            </DialogTitle>
+            <DialogDescription>
+              {deleteHard 
+                ? 'This action cannot be undone. The API key will be permanently removed.'
+                : 'This will deactivate the API key. It can be reactivated later.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Key name with copy button */}
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Key Name</Label>
+              <div className="flex items-center gap-2 bg-muted p-3 rounded-lg">
+                <span className="font-medium flex-1">{deleteTarget?.name}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => handleCopyKeyName(deleteTarget?.name)}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            
+            {/* Confirmation input */}
+            <div className="space-y-2">
+              <Label>
+                Type <span className="font-semibold text-foreground">"{deleteTarget?.name}"</span> to confirm
+              </Label>
+              <Input
+                placeholder="Enter the key name to confirm"
+                value={deleteConfirmName}
+                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                className={deleteConfirmName && deleteConfirmName !== deleteTarget?.name ? 'border-destructive' : ''}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setShowDeleteDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteKey}
+              disabled={deleteConfirmName !== deleteTarget?.name || deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? 'Deleting...' : deleteHard ? 'Delete Permanently' : 'Deactivate'}
             </Button>
           </DialogFooter>
         </DialogContent>
