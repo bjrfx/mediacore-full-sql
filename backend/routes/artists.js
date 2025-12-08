@@ -153,19 +153,21 @@ router.get('/api/artists/:id/albums', checkApiKeyPermissions(), async (req, res)
     
     // Map camelCase orderBy to snake_case
     const orderByMap = {
-      'releaseDate': 'created_at',
-      'createdAt': 'created_at',
-      'name': 'name',
-      'title': 'name'
+      'releaseDate': 'a.created_at',
+      'createdAt': 'a.created_at',
+      'name': 'a.name',
+      'title': 'a.name'
     };
-    const dbOrderBy = orderByMap[orderBy] || 'created_at';
+    const dbOrderBy = orderByMap[orderBy] || 'a.created_at';
     const dbOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
     
-    // Get albums for this artist using SQL query
+    // Get albums for this artist with track counts
     const albums = await db.query(`
-      SELECT id, name, artist_id, artist_name, cover_image_url, year, genre, description, created_at, updated_at
-      FROM albums
-      WHERE artist_id = ?
+      SELECT 
+        a.*,
+        (SELECT COUNT(*) FROM media WHERE album_id = a.id) as track_count
+      FROM albums a
+      WHERE a.artist_id = ?
       ORDER BY ${dbOrderBy} ${dbOrder}
     `, [id]);
     
@@ -181,6 +183,7 @@ router.get('/api/artists/:id/albums', checkApiKeyPermissions(), async (req, res)
       year: album.year,
       genre: album.genre,
       description: album.description,
+      trackCount: album.track_count || 0,
       createdAt: album.created_at,
       updatedAt: album.updated_at
     }));

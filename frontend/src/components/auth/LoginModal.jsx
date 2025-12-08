@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../../store';
-import { Loader2, AlertCircle, Mail, Lock, User, CheckCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Mail, Lock, User, CheckCircle, Copy } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -21,8 +21,19 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [copiedField, setCopiedField] = useState(null);
   
   const { login } = useAuthStore();
+
+  const copyToClipboard = async (text, field) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   // Listen for sign-up mode trigger
   useEffect(() => {
@@ -285,8 +296,36 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
               <div className="text-center text-sm space-y-2 p-4 bg-muted/50 rounded-lg">
                 <p className="font-medium text-muted-foreground">Test Account:</p>
                 <div className="font-mono text-xs space-y-1">
-                  <p>Email: <span className="text-primary font-semibold">admin@mediacore.com</span></p>
-                  <p>Password: <span className="text-primary font-semibold">Admin@MediaCore123!</span></p>
+                  <p>
+                    Email:{' '}
+                    <span
+                      onClick={() => copyToClipboard('admin@mediacore.com', 'email')}
+                      className="text-primary font-semibold cursor-pointer hover:underline inline-flex items-center gap-1"
+                      title="Click to copy"
+                    >
+                      admin@mediacore.com
+                      {copiedField === 'email' ? (
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3 opacity-50" />
+                      )}
+                    </span>
+                  </p>
+                  <p>
+                    Password:{' '}
+                    <span
+                      onClick={() => copyToClipboard('Admin@MediaCore123!', 'password')}
+                      className="text-primary font-semibold cursor-pointer hover:underline inline-flex items-center gap-1"
+                      title="Click to copy"
+                    >
+                      Admin@MediaCore123!
+                      {copiedField === 'password' ? (
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3 opacity-50" />
+                      )}
+                    </span>
+                  </p>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   ⚠️ Change password after first login in production
