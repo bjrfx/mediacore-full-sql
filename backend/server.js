@@ -14,6 +14,7 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // Request logger
 app.use((req, res, next) => {
@@ -39,6 +40,9 @@ app.use(mediaRoutes);
 
 const artistsRoutes = require('./routes/artists');
 app.use(artistsRoutes);
+
+const albumsRoutes = require('./routes/albums');
+app.use(albumsRoutes);
 
 // Stubs
 const { checkAuth, checkAdminAuth } = require('./middleware');
@@ -364,6 +368,40 @@ app.get('/admin/analytics/subscriptions', checkAdminAuth, async (req, res) => {
 const { PERMISSION_PRESETS } = require('./middleware/checkApiKeyPermissions');
 app.get('/admin/permissions', checkAdminAuth, (req, res) => {
   res.json({ success: true, data: PERMISSION_PRESETS });
+});
+
+// Admin system settings
+app.get('/admin/system/settings', checkAdminAuth, (req, res) => {
+  const settings = {
+    productionMode: process.env.NODE_ENV === 'production' || process.env.PRODUCTION === 'true',
+    nodeEnv: process.env.NODE_ENV || 'development',
+    uploadDir: process.env.UPLOAD_DIR || './public/uploads',
+    productionBasePath: '/home/masakali/mediacoreapi-sql.masakalirestrobar.ca/backend/public',
+  };
+  res.json({ success: true, data: settings });
+});
+
+app.post('/admin/system/settings', checkAdminAuth, (req, res) => {
+  const { productionMode } = req.body;
+  
+  // Update environment variable (this will only affect current process)
+  if (productionMode !== undefined) {
+    process.env.PRODUCTION = productionMode ? 'true' : 'false';
+    
+    // If switching to production, update NODE_ENV as well
+    if (productionMode) {
+      process.env.NODE_ENV = 'production';
+    }
+  }
+  
+  res.json({ 
+    success: true, 
+    message: 'Settings updated. Note: Restart server for full effect.',
+    data: {
+      productionMode: process.env.NODE_ENV === 'production' || process.env.PRODUCTION === 'true',
+      nodeEnv: process.env.NODE_ENV || 'development',
+    }
+  });
 });
 
 // Error handling

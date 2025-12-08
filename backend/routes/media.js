@@ -21,7 +21,13 @@ const { checkAuth, checkAdminAuth, checkApiKeyPermissions } = require('../middle
 // MULTER CONFIGURATION FOR FILE UPLOADS
 // =============================================================================
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './public/uploads';
+// Check if we're in production mode
+const IS_PRODUCTION = process.env.NODE_ENV === 'production' || process.env.PRODUCTION === 'true';
+const PRODUCTION_BASE_PATH = '/home/masakali/mediacoreapi-sql.masakalirestrobar.ca/backend/public';
+const UPLOAD_DIR = IS_PRODUCTION 
+  ? path.join(PRODUCTION_BASE_PATH, 'uploads')
+  : (process.env.UPLOAD_DIR || './public/uploads');
+
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 // Allowed file types
@@ -42,13 +48,18 @@ const ALLOWED_EXTENSIONS = {
   audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
 };
 
-// Ensure upload directory exists
+// Ensure upload directory exists (only for local development)
 const ensureUploadDir = () => {
-  const uploadPath = path.resolve(UPLOAD_DIR);
-  if (!fs.existsSync(uploadPath)) {
-    fs.mkdirSync(uploadPath, { recursive: true });
+  // Only try to create directory if not in production or if it's a local path
+  if (!IS_PRODUCTION || !UPLOAD_DIR.startsWith('/home/')) {
+    const uploadPath = path.resolve(UPLOAD_DIR);
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    return uploadPath;
   }
-  return uploadPath;
+  // In production, assume directory already exists
+  return UPLOAD_DIR;
 };
 
 const uploadPath = ensureUploadDir();
@@ -390,11 +401,22 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     // Generate contentGroupId if not provided
     const finalContentGroupId = contentGroupId || `cg_${Date.now()}_${uuidv4().substring(0, 8)}`;
     
-    // Construct file path and URL
-    const relativePath = `/home/masakali/mediacoreapi-sql.masakalirestrobar.ca/backend/storage/media${type}/${file.filename}`;
-    const fileUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+    // Construct file path and URL (file is already saved by multer)
+    // In production: Use absolute path, In development: Use relative path
+    let relativePath, fileUrl;
     
-    // Get file size and duration from file if available
+    if (IS_PRODUCTION) {
+      // Production: Full absolute path for cPanel
+      relativePath = `/storage/media/${type}/${file.filename}`;
+      // URL should be accessible via your domain
+      fileUrl = `https://mediacoreapi-sql.masakalirestrobar.ca/uploads/${type}/${file.filename}`;
+    } else {
+      // Development: Relative path
+      relativePath = `/uploads/${type}/${file.filename}`;
+      fileUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+    }
+    
+    // Get file size from uploaded file
     const fileSize = file.size || 0;
     
     // Prepare media data  
