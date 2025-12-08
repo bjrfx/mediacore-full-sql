@@ -19,23 +19,51 @@ const { checkAdminAuth, checkApiKeyPermissions } = require('../middleware');
 
 /**
  * GET /api/artists
- * Get all artists with pagination and sorting
+ * Get all artists with pagination, sorting, and album/track counts
  * Query params: limit, orderBy, order
  */
 router.get('/api/artists', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { limit = 50, orderBy = 'createdAt', order = 'desc' } = req.query;
     
-    const artists = await artistsDAO.getAll(
-      orderBy,
-      order,
-      parseInt(limit)
-    );
+    // Map camelCase orderBy to snake_case
+    const orderByMap = {
+      'createdAt': 'a.created_at',
+      'name': 'a.name',
+      'id': 'a.id'
+    };
+    const dbOrderBy = orderByMap[orderBy] || 'a.created_at';
+    const dbOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
+    // Query with album and track counts
+    const artists = await db.query(`
+      SELECT 
+        a.*,
+        (SELECT COUNT(*) FROM albums WHERE artist_id = a.id) as album_count,
+        (SELECT COUNT(*) FROM media WHERE artist_id = a.id) as track_count
+      FROM artists a
+      ORDER BY ${dbOrderBy} ${dbOrder}
+      LIMIT ?
+    `, [parseInt(limit)]);
+    
+    // Transform to camelCase for frontend
+    const transformedArtists = artists.map(artist => ({
+      id: artist.id,
+      name: artist.name,
+      description: artist.description,
+      bio: artist.description,
+      imageUrl: artist.image_url,
+      image: artist.image_url,
+      albumCount: artist.album_count || 0,
+      trackCount: artist.track_count || 0,
+      createdAt: artist.created_at,
+      updatedAt: artist.updated_at
+    }));
     
     res.json({
       success: true,
-      count: artists.length,
-      data: artists
+      count: transformedArtists.length,
+      data: transformedArtists
     });
   } catch (error) {
     console.error('Error fetching artists:', error);
@@ -49,14 +77,23 @@ router.get('/api/artists', checkApiKeyPermissions(), async (req, res) => {
 
 /**
  * GET /api/artists/:id
- * Get single artist by ID
+ * Get single artist by ID with album/track counts
  */
 router.get('/api/artists/:id', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { id } = req.params;
-    const artist = await artistsDAO.getById(id);
     
-    if (!artist) {
+    // Get artist with counts
+    const artists = await db.query(`
+      SELECT 
+        a.*,
+        (SELECT COUNT(*) FROM albums WHERE artist_id = a.id) as album_count,
+        (SELECT COUNT(*) FROM media WHERE artist_id = a.id) as track_count
+      FROM artists a
+      WHERE a.id = ?
+    `, [id]);
+    
+    if (!artists || artists.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'Not Found',
@@ -64,9 +101,25 @@ router.get('/api/artists/:id', checkApiKeyPermissions(), async (req, res) => {
       });
     }
     
+    const artist = artists[0];
+    
+    // Transform to camelCase
+    const transformedArtist = {
+      id: artist.id,
+      name: artist.name,
+      description: artist.description,
+      bio: artist.description,
+      imageUrl: artist.image_url,
+      image: artist.image_url,
+      albumCount: artist.album_count || 0,
+      trackCount: artist.track_count || 0,
+      createdAt: artist.created_at,
+      updatedAt: artist.updated_at
+    };
+    
     res.json({
       success: true,
-      data: artist
+      data: transformedArtist
     });
   } catch (error) {
     console.error('Error fetching artist:', error);
@@ -293,12 +346,13 @@ router.put('/admin/artists/:id', checkAdminAuth, async (req, res) => {
 /**
  * DELETE /admin/artists/:id
  * Delete artist (Admin only)
- * Query param: cascade (true/false) - if true, nullifies artistId in related content
+ * Query param: cascade (true/false) - if true, deletes albums and unassigns media
  */
 router.delete('/admin/artists/:id', checkAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { cascade = false } = req.query;
+    const { cascade } = req.query;
+    const doCascade = cascade === 'true' || cascade === true;
     
     const artist = await artistsDAO.getById(id);
     
@@ -311,33 +365,28 @@ router.delete('/admin/artists/:id', checkAdminAuth, async (req, res) => {
     }
     
     // Check for associated albums
-    const [albums] = await db.query('SELECT COUNT(*) as count FROM albums WHERE artistId = ?', [id]);
-    const albumCount = albums[0].count;
+    const albums = await db.query('SELECT COUNT(*) as count FROM albums WHERE artist_id = ?', [id]);
+    const albumCount = albums[0]?.count || 0;
     
     // Check for associated media
-    const [media] = await db.query('SELECT COUNT(*) as count FROM media WHERE artistId = ?', [id]);
-    const mediaCount = media[0].count;
+    const media = await db.query('SELECT COUNT(*) as count FROM media WHERE artist_id = ?', [id]);
+    const mediaCount = media[0]?.count || 0;
     
-    if (!cascade && (albumCount > 0 || mediaCount > 0)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Bad Request',
-        message: `Cannot delete artist with ${albumCount} albums and ${mediaCount} media items. Use ?cascade=true to delete all associated content.`
-      });
+    // If cascade delete, unassign media and delete albums
+    if (doCascade) {
+      // First unassign media from this artist (don't delete media files)
+      await db.query('UPDATE media SET artist_id = NULL, updated_at = NOW() WHERE artist_id = ?', [id]);
+      // Delete albums associated with this artist
+      await db.query('DELETE FROM albums WHERE artist_id = ?', [id]);
     }
     
-    // If cascade delete, remove artist references from albums and media
-    if (cascade === 'true') {
-      await db.query('UPDATE albums SET artistId = NULL, updatedAt = NOW() WHERE artistId = ?', [id]);
-      await db.query('UPDATE media SET artistId = NULL, updatedAt = NOW() WHERE artistId = ?', [id]);
-    }
-    
-    await artistsDAO.delete(id);
+    // Delete the artist
+    await db.query('DELETE FROM artists WHERE id = ?', [id]);
     
     res.json({
       success: true,
       message: 'Artist deleted successfully',
-      cascade: cascade === 'true',
+      cascade: doCascade,
       affectedAlbums: albumCount,
       affectedMedia: mediaCount
     });

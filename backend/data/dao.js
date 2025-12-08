@@ -151,9 +151,19 @@ const artistsDAO = {
     const fields = [];
     const values = [];
     
+    // Map camelCase/frontend field names to snake_case database column names
+    const fieldMap = {
+      'name': 'name',
+      'bio': 'description',
+      'description': 'description',
+      'image': 'image_url',
+      'imageUrl': 'image_url',
+      'image_url': 'image_url'
+    };
+    
     Object.keys(updates).forEach(key => {
-      if (updates[key] !== undefined) {
-        fields.push(`${key} = ?`);
+      if (updates[key] !== undefined && fieldMap[key]) {
+        fields.push(`${fieldMap[key]} = ?`);
         values.push(updates[key]);
       }
     });
