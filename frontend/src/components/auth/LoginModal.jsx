@@ -149,7 +149,7 @@ export default function LoginModal({ open, onOpenChange }) {
             <p className="font-medium text-muted-foreground">Test Account:</p>
             <div className="font-mono text-xs space-y-1">
               <p>Email: <span className="text-primary font-semibold">admin@mediacore.com</span></p>
-              <p>Password: <span className="text-primary font-semibold">admin123</span></p>
+              <p>Password: <span className="text-primary font-semibold">Admin@MediaCore123!</span></p>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               ⚠️ Change password after first login in production

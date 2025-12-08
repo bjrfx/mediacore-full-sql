@@ -9,7 +9,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 // JWT Configuration
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'c2e86adc6fc7a209120ae82e12e2d2c5153bc347a620c565595df0cd8204723a';
 const JWT_ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';  // 15 minutes
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';  // 7 days
 
