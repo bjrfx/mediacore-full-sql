@@ -402,18 +402,14 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     const finalContentGroupId = contentGroupId || `cg_${Date.now()}_${uuidv4().substring(0, 8)}`;
     
     // Construct file path and URL (file is already saved by multer)
-    // In production: Use absolute path, In development: Use relative path
-    let relativePath, fileUrl;
+    let fileUrl;
     
     if (IS_PRODUCTION) {
-      // Production: Full absolute path for cPanel
-      relativePath = `/storage/media/${type}/${file.filename}`;
-      // URL should be accessible via your domain
+      // Production: URL accessible via domain (file already saved by multer to correct location)
       fileUrl = `https://mediacoreapi-sql.masakalirestrobar.ca/uploads/${type}/${file.filename}`;
     } else {
       // Development: Relative path
-      relativePath = `/uploads/${type}/${file.filename}`;
-      fileUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+      fileUrl = `${req.protocol}://${req.get('host')}/uploads/${type}/${file.filename}`;
     }
     
     // Get file size from uploaded file
