@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '../../store';
-import { Loader2, AlertCircle, Mail, Lock } from 'lucide-react';
+import { Loader2, AlertCircle, Mail, Lock, User, CheckCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,18 +13,38 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 
-export default function LoginModal({ open, onOpenChange }) {
+export default function LoginModal({ open, onOpenChange, mode: initialMode = 'login' }) {
+  const [mode, setMode] = useState(initialMode); // 'login' or 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   
   const { login } = useAuthStore();
+
+  // Listen for sign-up mode trigger
+  useEffect(() => {
+    const handleShowSignUp = () => {
+      setMode('signup');
+    };
+    window.addEventListener('show-signup-modal', handleShowSignUp);
+    return () => window.removeEventListener('show-signup-modal', handleShowSignUp);
+  }, []);
+
+  // Reset mode when modal closes
+  useEffect(() => {
+    if (!open) {
+      setMode('login');
+    }
+  }, [open]);
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       await login(email, password);
@@ -39,26 +59,104 @@ export default function LoginModal({ open, onOpenChange }) {
     }
   };
 
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          displayName: displayName.trim() || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
+      // Show success message
+      setSuccess('Account created successfully! You can now sign in.');
+      
+      // Clear form
+      setEmail('');
+      setPassword('');
+      setDisplayName('');
+      
+      // Switch to login mode after 2 seconds
+      setTimeout(() => {
+        setMode('login');
+        setSuccess(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError(err.message || 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleClose = (isOpen) => {
     if (!isOpen) {
       setError(null);
+      setSuccess(null);
       setEmail('');
       setPassword('');
+      setDisplayName('');
+      setMode('login');
     }
     onOpenChange(isOpen);
   };
+
+  const toggleMode = () => {
+    setMode(mode === 'login' ? 'signup' : 'login');
+    setError(null);
+    setSuccess(null);
+  };
+
+  const isSignUpMode = mode === 'signup';
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl">Welcome Back</DialogTitle>
+          <DialogTitle className="text-center text-2xl">
+            {isSignUpMode ? 'Create Account' : 'Welcome Back'}
+          </DialogTitle>
           <DialogDescription className="text-center">
-            Sign in to access your library, playlists, and more
+            {isSignUpMode 
+              ? 'Sign up to access your library, playlists, and more' 
+              : 'Sign in to access your library, playlists, and more'
+            }
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleEmailLogin} className="space-y-4 py-4">
+        <form onSubmit={isSignUpMode ? handleSignUp : handleEmailLogin} className="space-y-4 py-4">
+          {/* Success message */}
+          <AnimatePresence>
+            {success && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 text-sm"
+              >
+                <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                {success}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Error message */}
           <AnimatePresence>
             {error && (
@@ -73,6 +171,28 @@ export default function LoginModal({ open, onOpenChange }) {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Display Name field (Sign Up only) */}
+          {isSignUpMode && (
+            <div className="space-y-2">
+              <Label htmlFor="displayName" className="text-sm font-medium">
+                Display Name (optional)
+              </Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="displayName"
+                  type="text"
+                  placeholder="Your name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="pl-10"
+                  disabled={loading}
+                  autoComplete="name"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Email field */}
           <div className="space-y-2">
@@ -116,7 +236,7 @@ export default function LoginModal({ open, onOpenChange }) {
             </div>
           </div>
 
-          {/* Sign in button */}
+          {/* Submit button */}
           <Button 
             type="submit" 
             className="w-full h-11" 
@@ -125,36 +245,55 @@ export default function LoginModal({ open, onOpenChange }) {
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
+                {isSignUpMode ? 'Creating account...' : 'Signing in...'}
               </>
             ) : (
-              'Sign In'
+              isSignUpMode ? 'Create Account' : 'Sign In'
             )}
           </Button>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Default Credentials
-              </span>
-            </div>
+          {/* Mode toggle */}
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              disabled={loading}
+            >
+              {isSignUpMode 
+                ? 'Already have an account? Sign in' 
+                : "Don't have an account? Sign up"
+              }
+            </button>
           </div>
 
-          {/* Default admin info */}
-          <div className="text-center text-sm space-y-2 p-4 bg-muted/50 rounded-lg">
-            <p className="font-medium text-muted-foreground">Test Account:</p>
-            <div className="font-mono text-xs space-y-1">
-              <p>Email: <span className="text-primary font-semibold">admin@mediacore.com</span></p>
-              <p>Password: <span className="text-primary font-semibold">Admin@MediaCore123!</span></p>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              ⚠️ Change password after first login in production
-            </p>
-          </div>
+          {/* Divider - only show for login mode */}
+          {!isSignUpMode && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    Default Credentials
+                  </span>
+                </div>
+              </div>
+
+              {/* Default admin info */}
+              <div className="text-center text-sm space-y-2 p-4 bg-muted/50 rounded-lg">
+                <p className="font-medium text-muted-foreground">Test Account:</p>
+                <div className="font-mono text-xs space-y-1">
+                  <p>Email: <span className="text-primary font-semibold">admin@mediacore.com</span></p>
+                  <p>Password: <span className="text-primary font-semibold">Admin@MediaCore123!</span></p>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  ⚠️ Change password after first login in production
+                </p>
+              </div>
+            </>
+          )}
         </form>
 
         {/* Features preview */}

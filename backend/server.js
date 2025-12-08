@@ -64,19 +64,20 @@ app.get('/api/albums/:id', async (req, res) => {
 
 app.get('/api/settings', async (req, res) => {
   try {
-    const [settings] = await db.query('SELECT * FROM app_settings');
+    const settings = await db.query('SELECT setting_key, setting_value FROM app_settings WHERE is_public = TRUE');
     const settingsObj = {};
-    settings.forEach(s => { settingsObj[s.key] = s.value; });
+    settings.forEach(s => { settingsObj[s.setting_key] = s.setting_value; });
     res.json({ success: true, data: settingsObj });
   } catch (error) {
+    console.error('Error fetching settings:', error);
     res.status(500).json({ success: false, message: 'Error fetching settings' });
   }
 });
 
 app.get('/api/user/subscription', checkAuth, async (req, res) => {
   try {
-    const subscriptions = await db.query('SELECT * FROM user_subscriptions WHERE uid = ? ORDER BY created_at DESC LIMIT 1', [req.user.uid]);
-    if (subscriptions.length === 0) return res.json({ success: true, data: { plan: 'free', status: 'active' } });
+    const subscriptions = await db.query('SELECT * FROM user_subscriptions WHERE uid = ?', [req.user.uid]);
+    if (subscriptions.length === 0) return res.json({ success: true, data: { subscription_tier: 'free', status: 'active' } });
     res.json({ success: true, data: subscriptions[0] });
   } catch (error) {
     console.error('Error fetching subscription:', error);
@@ -96,7 +97,10 @@ app.get('/api/user/stats', checkAuth, async (req, res) => {
 
 app.post('/api/user/heartbeat', checkAuth, async (req, res) => {
   try {
-    await db.query('INSERT INTO user_presence (userId, last_seen, status) VALUES (?, NOW(), ?) ON DUPLICATE KEY UPDATE last_seen = NOW()', [req.user.uid, 'online']);
+    await db.query(
+      'INSERT INTO user_presence (uid, is_online, last_active) VALUES (?, TRUE, NOW()) ON DUPLICATE KEY UPDATE is_online = TRUE, last_active = NOW()',
+      [req.user.uid]
+    );
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating heartbeat:', error);
@@ -116,7 +120,9 @@ app.get('/admin/users', checkAdminAuth, async (req, res) => {
 
 app.get('/admin/users/online', checkAdminAuth, async (req, res) => {
   try {
-    const users = await db.query('SELECT u.uid, u.email, u.display_name, up.last_seen FROM users u JOIN user_presence up ON u.uid = up.userId WHERE up.last_seen >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
+    const users = await db.query(
+      'SELECT u.uid, u.email, u.display_name, up.last_active FROM users u JOIN user_presence up ON u.uid = up.uid WHERE up.is_online = TRUE AND up.last_active >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
+    );
     res.json({ success: true, count: users.length, data: users });
   } catch (error) {
     console.error('Error fetching online users:', error);

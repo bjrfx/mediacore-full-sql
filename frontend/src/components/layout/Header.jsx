@@ -78,6 +78,12 @@ export default function Header() {
     openModal('login');
   };
 
+  const handleSignUp = () => {
+    // Trigger sign-up mode
+    window.dispatchEvent(new Event('show-signup-modal'));
+    openModal('login');
+  };
+
   const handleSignOut = async () => {
     try {
       await logout();
@@ -220,7 +226,7 @@ export default function Header() {
           </>
         ) : (
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={handleSignIn}>
+            <Button variant="ghost" onClick={handleSignUp}>
               Sign up
             </Button>
             <Button variant="spotify" onClick={handleSignIn}>

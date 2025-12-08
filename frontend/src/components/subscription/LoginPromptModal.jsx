@@ -38,7 +38,8 @@ export default function LoginPromptModal({ open, onOpenChange }) {
 
   const handleSignUp = () => {
     handleClose();
-    // Trigger global login modal (with sign up mode if supported)
+    // Trigger global login modal in sign-up mode
+    window.dispatchEvent(new Event('show-signup-modal'));
     window.dispatchEvent(new Event('show-login-modal'));
   };
 
