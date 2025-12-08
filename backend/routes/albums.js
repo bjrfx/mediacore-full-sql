@@ -18,29 +18,52 @@ const { checkAdminAuth, checkApiKeyPermissions } = require('../middleware');
 
 /**
  * GET /api/albums
- * Get all albums
+ * Get all albums with track counts
  */
 router.get('/api/albums', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { limit = 50, artistId } = req.query;
     
-    let query = 'SELECT * FROM albums WHERE 1=1';
+    let query = `
+      SELECT 
+        a.*,
+        (SELECT COUNT(*) FROM media WHERE album_id = a.id) as track_count
+      FROM albums a
+      WHERE 1=1
+    `;
     const params = [];
     
     if (artistId) {
-      query += ' AND artist_id = ?';
+      query += ' AND a.artist_id = ?';
       params.push(artistId);
     }
     
-    query += ' ORDER BY created_at DESC LIMIT ?';
+    query += ' ORDER BY a.created_at DESC LIMIT ?';
     params.push(parseInt(limit));
     
     const albums = await db.query(query, params);
     
+    // Transform to camelCase for frontend
+    const transformedAlbums = albums.map(album => ({
+      id: album.id,
+      name: album.name,
+      title: album.name,
+      artistId: album.artist_id,
+      artistName: album.artist_name,
+      coverImage: album.cover_image_url,
+      coverImageUrl: album.cover_image_url,
+      year: album.year,
+      genre: album.genre,
+      description: album.description,
+      trackCount: album.track_count || 0,
+      createdAt: album.created_at,
+      updatedAt: album.updated_at
+    }));
+    
     res.json({
       success: true,
-      count: albums.length,
-      data: albums
+      count: transformedAlbums.length,
+      data: transformedAlbums
     });
   } catch (error) {
     console.error('Error fetching albums:', error);
@@ -54,14 +77,21 @@ router.get('/api/albums', checkApiKeyPermissions(), async (req, res) => {
 
 /**
  * GET /api/albums/:id
- * Get single album by ID
+ * Get single album by ID with track count
  */
 router.get('/api/albums/:id', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { id } = req.params;
-    const album = await db.queryOne('SELECT * FROM albums WHERE id = ?', [id]);
     
-    if (!album) {
+    const albums = await db.query(`
+      SELECT 
+        a.*,
+        (SELECT COUNT(*) FROM media WHERE album_id = a.id) as track_count
+      FROM albums a
+      WHERE a.id = ?
+    `, [id]);
+    
+    if (!albums || albums.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'Not Found',
@@ -69,9 +99,28 @@ router.get('/api/albums/:id', checkApiKeyPermissions(), async (req, res) => {
       });
     }
     
+    const album = albums[0];
+    
+    // Transform to camelCase
+    const transformedAlbum = {
+      id: album.id,
+      name: album.name,
+      title: album.name,
+      artistId: album.artist_id,
+      artistName: album.artist_name,
+      coverImage: album.cover_image_url,
+      coverImageUrl: album.cover_image_url,
+      year: album.year,
+      genre: album.genre,
+      description: album.description,
+      trackCount: album.track_count || 0,
+      createdAt: album.created_at,
+      updatedAt: album.updated_at
+    };
+    
     res.json({
       success: true,
-      data: album
+      data: transformedAlbum
     });
   } catch (error) {
     console.error('Error fetching album:', error);
