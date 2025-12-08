@@ -1,398 +1,183 @@
 /**
  * Analytics Tracker Middleware
  * 
- * Tracks all API requests and stores analytics data in Firestore.
+ * Tracks all API requests and stores analytics data in MySQL.
  * Provides comprehensive stats including request counts, response times,
  * endpoint usage, API key usage, and more.
  */
 
-const { db } = require('../config/firebase');
+const { query } = require('../config/db');
 
-// In-memory cache for batching writes (improves performance)
+// In-memory cache for batching writes
 let requestBuffer = [];
 const BUFFER_FLUSH_INTERVAL = 10000; // Flush every 10 seconds
-const BUFFER_MAX_SIZE = 50; // Or when buffer reaches 50 items
+const BUFFER_MAX_SIZE = 50;
 
 /**
- * Flush the request buffer to Firestore
+ * Flush the request buffer to MySQL
  */
 const flushBuffer = async () => {
   if (requestBuffer.length === 0) return;
 
-  const batch = db.batch();
   const requests = [...requestBuffer];
   requestBuffer = [];
 
   try {
-    // Add individual request logs
+    // Insert analytics data to MySQL (fire and forget)
     for (const request of requests) {
-      const docRef = db.collection('analytics_requests').doc();
-      batch.set(docRef, request);
+      await query(
+        `INSERT INTO analytics_data 
+        (timestamp, endpoint, method, statusCode, responseTime, ipAddress, userAgent, apiKeyId, userId, success) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          request.timestamp,
+          request.endpoint,
+          request.method,
+          request.statusCode,
+          request.responseTime || 0,
+          request.ipAddress,
+          request.userAgent,
+          request.apiKeyId || null,
+          request.userId || null,
+          request.statusCode >= 200 && request.statusCode < 400
+        ]
+      ).catch(err => console.error('Failed to insert analytics:', err));
     }
 
-    // Update daily aggregates
-    const today = new Date().toISOString().split('T')[0];
-    const dailyRef = db.collection('analytics_daily').doc(today);
-    
-    const dailyDoc = await dailyRef.get();
-    const currentData = dailyDoc.exists ? dailyDoc.data() : {
-      date: today,
-      totalRequests: 0,
-      successfulRequests: 0,
-      failedRequests: 0,
-      totalResponseTime: 0,
-      endpoints: {},
-      methods: {},
-      statusCodes: {},
-      apiKeys: {},
-      hourlyRequests: {}
-    };
-
-    // Aggregate the buffered requests
-    for (const req of requests) {
-      currentData.totalRequests++;
-      
-      if (req.statusCode >= 200 && req.statusCode < 400) {
-        currentData.successfulRequests++;
-      } else {
-        currentData.failedRequests++;
-      }
-
-      currentData.totalResponseTime += req.responseTime || 0;
-
-      // Track by endpoint
-      const endpoint = req.endpoint || 'unknown';
-      currentData.endpoints[endpoint] = (currentData.endpoints[endpoint] || 0) + 1;
-
-      // Track by method
-      const method = req.method || 'unknown';
-      currentData.methods[method] = (currentData.methods[method] || 0) + 1;
-
-      // Track by status code
-      const statusCode = String(req.statusCode || 'unknown');
-      currentData.statusCodes[statusCode] = (currentData.statusCodes[statusCode] || 0) + 1;
-
-      // Track by API key (masked)
-      if (req.apiKeyId) {
-        currentData.apiKeys[req.apiKeyId] = (currentData.apiKeys[req.apiKeyId] || 0) + 1;
-      }
-
-      // Track hourly distribution
-      const hour = new Date(req.timestamp).getHours().toString().padStart(2, '0');
-      currentData.hourlyRequests[hour] = (currentData.hourlyRequests[hour] || 0) + 1;
-    }
-
-    // Calculate average response time
-    currentData.avgResponseTime = currentData.totalRequests > 0 
-      ? Math.round(currentData.totalResponseTime / currentData.totalRequests) 
-      : 0;
-
-    batch.set(dailyRef, currentData, { merge: true });
-
-    // Update overall stats
-    const overallRef = db.collection('analytics_stats').doc('overall');
-    const overallDoc = await overallRef.get();
-    const overallData = overallDoc.exists ? overallDoc.data() : {
-      totalRequests: 0,
-      totalSuccessful: 0,
-      totalFailed: 0,
-      createdAt: new Date().toISOString()
-    };
-
-    overallData.totalRequests += requests.length;
-    overallData.totalSuccessful += requests.filter(r => r.statusCode >= 200 && r.statusCode < 400).length;
-    overallData.totalFailed += requests.filter(r => r.statusCode >= 400).length;
-    overallData.lastUpdated = new Date().toISOString();
-
-    batch.set(overallRef, overallData, { merge: true });
-
-    await batch.commit();
-    console.log(`📊 Flushed ${requests.length} analytics records to Firestore`);
-  } catch (error) {
-    console.error('Error flushing analytics buffer:', error);
-    // Re-add failed requests to buffer for retry
-    requestBuffer = [...requests, ...requestBuffer];
+  } catch (err) {
+    console.error('Error flushing analytics buffer:', err);
   }
 };
 
-// Set up periodic flushing
+// Set up auto-flush interval
 setInterval(flushBuffer, BUFFER_FLUSH_INTERVAL);
-
-// Flush on process exit
-process.on('beforeExit', flushBuffer);
-process.on('SIGINT', async () => {
-  await flushBuffer();
-  process.exit(0);
-});
 
 /**
  * Analytics tracking middleware
- * Records details about each API request
  */
 const analyticsTracker = (req, res, next) => {
   const startTime = Date.now();
 
-  // Capture the original end function
-  const originalEnd = res.end;
-  const originalJson = res.json;
+  // Skip certain paths
+  const skipPaths = ['/health', '/favicon.ico'];
+  const isStaticFile = req.path.startsWith('/public/');
+  
+  if (skipPaths.includes(req.path) || isStaticFile) {
+    return next();
+  }
 
-  // Override res.json to capture response
-  res.json = function(data) {
-    res.responseBody = data;
-    return originalJson.call(this, data);
-  };
+  // Capture when response finishes
+  res.on('finish', () => {
+    try {
+      const responseTime = Date.now() - startTime;
+      
+      // Get IP address (handle proxies)
+      let ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
+      const forwardedFor = req.headers['x-forwarded-for'];
+      if (forwardedFor) {
+        ipAddress = forwardedFor.split(',')[0].trim();
+      }
 
-  // Override res.end to capture when response is sent
-  res.end = function(...args) {
-    const responseTime = Date.now() - startTime;
-    
-    // Don't track health check or static files
-    const skipPaths = ['/health', '/favicon.ico'];
-    const isStaticFile = req.path.startsWith('/public/');
-    
-    if (!skipPaths.includes(req.path) && !isStaticFile) {
       const analyticsData = {
-        timestamp: new Date().toISOString(),
-        method: req.method,
-        path: req.path,
+        timestamp: new Date(),
         endpoint: getEndpointCategory(req.path),
-        query: Object.keys(req.query).length > 0 ? req.query : null,
+        method: req.method,
         statusCode: res.statusCode,
         responseTime,
-        userAgent: req.get('User-Agent') || 'unknown',
-        ip: req.ip || req.connection.remoteAddress || 'unknown',
+        ipAddress,
+        userAgent: req.headers['user-agent'] || 'unknown',
         apiKeyId: req.apiKey?.id || null,
-        apiKeyName: req.apiKey?.name || null,
-        userId: req.user?.uid || null,
-        isAdmin: req.user?.isAdmin || false,
-        contentType: res.get('Content-Type') || 'unknown',
-        responseSize: res.get('Content-Length') || null,
+        userId: req.user?.id || null,
         success: res.statusCode >= 200 && res.statusCode < 400
       };
 
+      // Add to buffer
       requestBuffer.push(analyticsData);
 
       // Flush if buffer is full
       if (requestBuffer.length >= BUFFER_MAX_SIZE) {
         flushBuffer();
       }
-    }
 
-    return originalEnd.apply(this, args);
-  };
+    } catch (err) {
+      console.error('Error capturing analytics:', err);
+    }
+  });
 
   next();
 };
 
 /**
- * Categorize endpoint for aggregation
+ * Get endpoint category from request path
  */
-const getEndpointCategory = (path) => {
-  if (path.startsWith('/api/feed')) return '/api/feed';
-  if (path.startsWith('/api/media')) return '/api/media';
-  if (path.startsWith('/api/settings')) return '/api/settings';
-  if (path.startsWith('/admin/generate-key')) return '/admin/generate-key';
-  if (path.startsWith('/admin/api-keys')) return '/admin/api-keys';
-  if (path.startsWith('/admin/media')) return '/admin/media';
-  if (path.startsWith('/admin/settings')) return '/admin/settings';
-  if (path.startsWith('/admin/analytics')) return '/admin/analytics';
-  if (path === '/' || path === '/health') return path;
+function getEndpointCategory(path) {
+  if (path.startsWith('/auth')) return 'auth';
+  if (path.startsWith('/api/media')) return 'media';
+  if (path.startsWith('/api/artists')) return 'artists';
+  if (path.startsWith('/api/albums')) return 'albums';
+  if (path.startsWith('/admin')) return 'admin';
+  if (path.startsWith('/api')) return 'api';
   return 'other';
-};
+}
 
 /**
  * Get analytics summary
  */
-const getAnalyticsSummary = async (options = {}) => {
-  const { days = 30 } = options;
-  
+const getAnalyticsSummary = async (days = 30) => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+
   try {
-    // Get overall stats
-    const overallDoc = await db.collection('analytics_stats').doc('overall').get();
-    const overall = overallDoc.exists ? overallDoc.data() : { totalRequests: 0 };
+    const [totalRequests] = await query(
+      'SELECT COUNT(*) as count FROM analytics_data WHERE timestamp >= ?',
+      [cutoffDate]
+    );
 
-    // Get daily stats for the specified period
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    const startDateStr = startDate.toISOString().split('T')[0];
+    const [successRequests] = await query(
+      'SELECT COUNT(*) as count FROM analytics_data WHERE timestamp >= ? AND success = 1',
+      [cutoffDate]
+    );
 
-    const dailySnapshot = await db.collection('analytics_daily')
-      .where('date', '>=', startDateStr)
-      .orderBy('date', 'desc')
-      .get();
-
-    const dailyStats = dailySnapshot.docs.map(doc => doc.data());
-
-    // Calculate period totals
-    const periodStats = dailyStats.reduce((acc, day) => {
-      acc.totalRequests += day.totalRequests || 0;
-      acc.successfulRequests += day.successfulRequests || 0;
-      acc.failedRequests += day.failedRequests || 0;
-      acc.totalResponseTime += day.totalResponseTime || 0;
-
-      // Merge endpoint stats
-      for (const [endpoint, count] of Object.entries(day.endpoints || {})) {
-        acc.endpoints[endpoint] = (acc.endpoints[endpoint] || 0) + count;
-      }
-
-      // Merge method stats
-      for (const [method, count] of Object.entries(day.methods || {})) {
-        acc.methods[method] = (acc.methods[method] || 0) + count;
-      }
-
-      // Merge status code stats
-      for (const [code, count] of Object.entries(day.statusCodes || {})) {
-        acc.statusCodes[code] = (acc.statusCodes[code] || 0) + count;
-      }
-
-      return acc;
-    }, {
-      totalRequests: 0,
-      successfulRequests: 0,
-      failedRequests: 0,
-      totalResponseTime: 0,
-      endpoints: {},
-      methods: {},
-      statusCodes: {}
-    });
-
-    // Calculate averages
-    periodStats.avgResponseTime = periodStats.totalRequests > 0
-      ? Math.round(periodStats.totalResponseTime / periodStats.totalRequests)
-      : 0;
-
-    periodStats.successRate = periodStats.totalRequests > 0
-      ? Math.round((periodStats.successfulRequests / periodStats.totalRequests) * 100 * 100) / 100
-      : 0;
+    const [avgResponseTime] = await query(
+      'SELECT AVG(responseTime) as avg FROM analytics_data WHERE timestamp >= ?',
+      [cutoffDate]
+    );
 
     return {
-      overall,
-      period: {
-        days,
-        ...periodStats
-      },
-      daily: dailyStats,
-      topEndpoints: Object.entries(periodStats.endpoints)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10)
-        .map(([endpoint, count]) => ({ endpoint, count }))
+      totalRequests: totalRequests[0]?.count || 0,
+      successfulRequests: successRequests[0]?.count || 0,
+      avgResponseTime: Math.round(avgResponseTime[0]?.avg || 0)
     };
-  } catch (error) {
-    console.error('Error getting analytics summary:', error);
-    throw error;
+  } catch (err) {
+    console.error('Error getting analytics summary:', err);
+    return { totalRequests: 0, successfulRequests: 0, avgResponseTime: 0 };
   }
 };
 
 /**
- * Get real-time stats (last 24 hours by hour)
+ * Get real-time stats
  */
 const getRealTimeStats = async () => {
+  const last24h = new Date();
+  last24h.setHours(last24h.getHours() - 24);
+
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const [stats] = await query(
+      `SELECT 
+        COUNT(*) as requestsLast24h,
+        AVG(responseTime) as avgResponseTime
+      FROM analytics_data WHERE timestamp >= ?`,
+      [last24h]
+    );
 
-    const [todayDoc, yesterdayDoc] = await Promise.all([
-      db.collection('analytics_daily').doc(today).get(),
-      db.collection('analytics_daily').doc(yesterday).get()
-    ]);
-
-    const todayData = todayDoc.exists ? todayDoc.data() : null;
-    const yesterdayData = yesterdayDoc.exists ? yesterdayDoc.data() : null;
-
-    // Get recent requests (last 100)
-    const recentSnapshot = await db.collection('analytics_requests')
-      .orderBy('timestamp', 'desc')
-      .limit(100)
-      .get();
-
-    const recentRequests = recentSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-
-    // Calculate requests per minute (last 5 minutes)
-    const fiveMinutesAgo = Date.now() - 300000;
-    const recentCount = recentRequests.filter(r => 
-      new Date(r.timestamp).getTime() > fiveMinutesAgo
-    ).length;
-    const requestsPerMinute = Math.round((recentCount / 5) * 100) / 100;
-
-    return {
-      today: todayData,
-      yesterday: yesterdayData,
-      recentRequests: recentRequests.slice(0, 20),
-      requestsPerMinute,
-      bufferSize: requestBuffer.length
-    };
-  } catch (error) {
-    console.error('Error getting real-time stats:', error);
-    throw error;
-  }
-};
-
-/**
- * Get API key usage statistics
- */
-const getApiKeyStats = async (keyId = null) => {
-  try {
-    let query = db.collection('analytics_requests');
-    
-    if (keyId) {
-      query = query.where('apiKeyId', '==', keyId);
-    } else {
-      query = query.where('apiKeyId', '!=', null);
-    }
-
-    const snapshot = await query
-      .orderBy('apiKeyId')
-      .orderBy('timestamp', 'desc')
-      .limit(1000)
-      .get();
-
-    const requests = snapshot.docs.map(doc => doc.data());
-
-    // Group by API key
-    const keyStats = {};
-    for (const req of requests) {
-      if (!req.apiKeyId) continue;
-      
-      if (!keyStats[req.apiKeyId]) {
-        keyStats[req.apiKeyId] = {
-          id: req.apiKeyId,
-          name: req.apiKeyName,
-          totalRequests: 0,
-          successful: 0,
-          failed: 0,
-          endpoints: {},
-          lastUsed: null
-        };
-      }
-
-      const stat = keyStats[req.apiKeyId];
-      stat.totalRequests++;
-      
-      if (req.statusCode >= 200 && req.statusCode < 400) {
-        stat.successful++;
-      } else {
-        stat.failed++;
-      }
-
-      stat.endpoints[req.endpoint] = (stat.endpoints[req.endpoint] || 0) + 1;
-
-      if (!stat.lastUsed || req.timestamp > stat.lastUsed) {
-        stat.lastUsed = req.timestamp;
-      }
-    }
-
-    return Object.values(keyStats).sort((a, b) => b.totalRequests - a.totalRequests);
-  } catch (error) {
-    console.error('Error getting API key stats:', error);
-    throw error;
+    return stats[0] || { requestsLast24h: 0, avgResponseTime: 0 };
+  } catch (err) {
+    console.error('Error getting realtime stats:', err);
+    return { requestsLast24h: 0, avgResponseTime: 0 };
   }
 };
 
 module.exports = analyticsTracker;
 module.exports.getAnalyticsSummary = getAnalyticsSummary;
 module.exports.getRealTimeStats = getRealTimeStats;
-module.exports.getApiKeyStats = getApiKeyStats;
 module.exports.flushBuffer = flushBuffer;

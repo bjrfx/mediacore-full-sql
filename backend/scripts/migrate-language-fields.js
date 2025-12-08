@@ -1,8 +1,8 @@
 /**
  * Migration Script: Add Language Fields to Existing Media
  * 
- * This script adds default language ('en') and contentGroupId to existing
- * media documents that don't have these fields.
+ * This script adds default language ('en') to existing
+ * media records that don't have this field, and ensures contentGroupId is set.
  * 
  * Run this script once after deploying the multi-language API updates.
  * 
@@ -10,42 +10,17 @@
  *   node scripts/migrate-language-fields.js
  * 
  * Options:
- *   --dry-run    Preview changes without actually updating documents
+ *   --dry-run    Preview changes without actually updating records
  */
 
-const admin = require('firebase-admin');
+const { query } = require('../config/db');
 require('dotenv').config();
 
 // Check for dry-run flag
 const isDryRun = process.argv.includes('--dry-run');
 
-// Firebase Service Account Credentials
-const serviceAccount = {
-  "type": "service_account",
-  "project_id": process.env.FIREBASE_PROJECT_ID || "eckhart-tolle-7a33f",
-  "private_key_id": process.env.FIREBASE_PRIVATE_KEY_ID,
-  "private_key": process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  "client_email": process.env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@eckhart-tolle-7a33f.iam.gserviceaccount.com",
-  "client_id": process.env.FIREBASE_CLIENT_ID || "107429782563275261448",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(process.env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@eckhart-tolle-7a33f.iam.gserviceaccount.com")}`,
-  "universe_domain": "googleapis.com"
-};
-
-// Initialize Firebase Admin SDK
-if (admin.apps.length === 0) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
-  });
-}
-
-const db = admin.firestore();
-
 /**
- * Migrate media documents to include language fields
+ * Migrate media records to include language fields
  */
 async function migrateMediaLanguage() {
   console.log('═══════════════════════════════════════════════════════');
@@ -58,121 +33,132 @@ async function migrateMediaLanguage() {
   console.log('');
 
   try {
-    // Get all media documents
-    const snapshot = await db.collection('media_content').get();
+    // Get all media records without language set
+    const [mediaWithoutLanguage] = await query(
+      `SELECT id, title, language, contentGroupId FROM media 
+       WHERE language IS NULL OR language = '' OR contentGroupId IS NULL OR contentGroupId = ''`
+    );
     
-    console.log(`📊 Found ${snapshot.size} total media documents`);
+    console.log(`📊 Found ${mediaWithoutLanguage.length} total media records`);
     console.log('');
 
-    // Track documents to update
-    const documentsToUpdate = [];
-    const documentsAlreadyMigrated = [];
+    // Track records to update
+    const recordsToUpdate = [];
+    const recordsAlreadyMigrated = [];
 
-    snapshot.docs.forEach(doc => {
-      const data = doc.data();
-      
-      // Check if document needs migration
-      const needsLanguage = !data.language;
-      const needsContentGroupId = !data.contentGroupId;
+    for (const record of mediaWithoutLanguage) {
+      const needsLanguage = !record.language;
+      const needsContentGroupId = !record.contentGroupId;
       
       if (needsLanguage || needsContentGroupId) {
-        documentsToUpdate.push({
-          id: doc.id,
-          ref: doc.ref,
+        recordsToUpdate.push({
+          id: record.id,
           currentData: {
-            title: data.title,
-            language: data.language,
-            contentGroupId: data.contentGroupId
+            title: record.title,
+            language: record.language,
+            contentGroupId: record.contentGroupId
           },
           updates: {
-            language: needsLanguage ? 'en' : data.language,
-            contentGroupId: needsContentGroupId ? `cg_${doc.id}` : data.contentGroupId
+            language: 'en',
+            contentGroupId: `cg_${record.id}`
           }
         });
       } else {
-        documentsAlreadyMigrated.push({
-          id: doc.id,
-          language: data.language,
-          contentGroupId: data.contentGroupId
+        recordsAlreadyMigrated.push({
+          id: record.id,
+          language: record.language,
+          contentGroupId: record.contentGroupId
         });
       }
-    });
+    }
 
-    console.log(`✅ ${documentsAlreadyMigrated.length} documents already have language fields`);
-    console.log(`📝 ${documentsToUpdate.length} documents need migration`);
-    console.log('');
+    if (recordsAlreadyMigrated.length > 0) {
+      console.log(`✅ Already migrated: ${recordsAlreadyMigrated.length}`);
+      console.log('');
+    }
 
-    if (documentsToUpdate.length === 0) {
-      console.log('✨ All documents are already migrated. Nothing to do!');
+    if (recordsToUpdate.length === 0) {
+      console.log('✨ All media records are already fully migrated!');
       return;
     }
 
-    // Preview changes
-    console.log('📋 Documents to be updated:');
-    console.log('───────────────────────────────────────────────────────');
-    documentsToUpdate.forEach((doc, index) => {
-      console.log(`  ${index + 1}. ${doc.id}`);
-      console.log(`     Title: "${doc.currentData.title || 'N/A'}"`);
-      console.log(`     Language: ${doc.currentData.language || '(none)'} → ${doc.updates.language}`);
-      console.log(`     ContentGroupId: ${doc.currentData.contentGroupId || '(none)'} → ${doc.updates.contentGroupId}`);
-    });
-    console.log('───────────────────────────────────────────────────────');
+    console.log(`📝 Records to update: ${recordsToUpdate.length}`);
     console.log('');
+
+    // Show preview
+    console.log('─── Preview of Changes ─────────────────────────────');
+    recordsToUpdate.slice(0, 5).forEach((record, idx) => {
+      console.log(`\n${idx + 1}. "${record.currentData.title}" (ID: ${record.id})`);
+      console.log(`   Current: language=${record.currentData.language || 'NULL'}, contentGroupId=${record.currentData.contentGroupId || 'NULL'}`);
+      console.log(`   Will be: language=${record.updates.language}, contentGroupId=${record.updates.contentGroupId}`);
+    });
+
+    if (recordsToUpdate.length > 5) {
+      console.log(`\n   ... and ${recordsToUpdate.length - 5} more records`);
+    }
+
+    console.log('\n─────────────────────────────────────────────────');
 
     if (isDryRun) {
-      console.log('⚠️  DRY RUN - No changes were made.');
-      console.log('   Run without --dry-run to apply these changes.');
+      console.log('\n✅ Dry run complete - no changes made');
+      console.log(`\n📊 Summary:`);
+      console.log(`   • Would update: ${recordsToUpdate.length} records`);
+      console.log(`   • Already migrated: ${recordsAlreadyMigrated.length} records`);
+      console.log(`   • Total media: ${mediaWithoutLanguage.length + recordsAlreadyMigrated.length}`);
       return;
     }
 
-    // Perform the migration in batches
-    console.log('🚀 Starting migration...');
-    
-    const BATCH_SIZE = 500; // Firestore batch limit
-    let batchCount = 0;
-    let updatedCount = 0;
+    // Perform actual migration
+    console.log('\n� Starting migration...\n');
 
-    for (let i = 0; i < documentsToUpdate.length; i += BATCH_SIZE) {
-      const batchDocs = documentsToUpdate.slice(i, i + BATCH_SIZE);
-      const batch = db.batch();
+    let successCount = 0;
+    let failCount = 0;
 
-      batchDocs.forEach(doc => {
-        batch.update(doc.ref, {
-          language: doc.updates.language,
-          contentGroupId: doc.updates.contentGroupId,
-          updatedAt: new Date().toISOString(),
-          migratedAt: new Date().toISOString()
-        });
-      });
-
-      await batch.commit();
-      batchCount++;
-      updatedCount += batchDocs.length;
-
-      console.log(`   ✅ Batch ${batchCount}: Updated ${batchDocs.length} documents (Total: ${updatedCount}/${documentsToUpdate.length})`);
+    for (const record of recordsToUpdate) {
+      try {
+        await query(
+          `UPDATE media SET language = ?, contentGroupId = ? WHERE id = ?`,
+          [record.updates.language, record.updates.contentGroupId, record.id]
+        );
+        successCount++;
+        
+        if (successCount % 10 === 0) {
+          console.log(`✅ Updated ${successCount}/${recordsToUpdate.length} records...`);
+        }
+      } catch (err) {
+        failCount++;
+        console.error(`❌ Failed to update record ${record.id}:`, err.message);
+      }
     }
 
+    console.log('\n═══════════════════════════════════════════════════════');
+    console.log('  ✅ Migration Complete!');
+    console.log('═══════════════════════════════════════════════════════');
     console.log('');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log(`  ✅ Migration Complete!`);
-    console.log(`     Updated: ${updatedCount} documents`);
-    console.log(`     Batches: ${batchCount}`);
-    console.log('═══════════════════════════════════════════════════════');
+    console.log(`📊 Results:`);
+    console.log(`   ✅ Successfully updated: ${successCount} records`);
+    if (failCount > 0) {
+      console.log(`   ❌ Failed: ${failCount} records`);
+    }
+    console.log(`   📝 Already migrated: ${recordsAlreadyMigrated.length} records`);
+    console.log('');
+    console.log('🎉 All media records now have language and contentGroupId fields!');
 
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
+  } catch (err) {
+    console.error('\n❌ Migration failed:', err.message);
+    console.error(err);
     process.exit(1);
   }
 }
 
-// Run the migration
-migrateMediaLanguage()
-  .then(() => {
-    console.log('');
-    console.log('🎉 Script finished successfully');
+// Run migration if called directly
+if (require.main === module) {
+  migrateMediaLanguage().then(() => {
     process.exit(0);
-  })
-  .catch(error => {
-    console.error('💥 Script failed:', error);
+  }).catch((err) => {
+    console.error('Fatal error:', err);
     process.exit(1);
   });
+}
+
+module.exports = { migrateMediaLanguage };

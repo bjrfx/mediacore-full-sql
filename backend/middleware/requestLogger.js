@@ -1,11 +1,11 @@
 /**
  * Request Logger Middleware
  * 
- * Logs every API request to the requestLogs collection in Firestore.
+ * Logs every API request to the request_logs table in MySQL.
  * This provides data for the analytics dashboard.
  */
 
-const { db, admin } = require('../config/firebase');
+const { query } = require('../config/db');
 
 /**
  * Request logging middleware
@@ -35,7 +35,7 @@ const requestLogger = (req, res, next) => {
       }
 
       const logData = {
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        timestamp: new Date(),
         endpoint: req.path,
         method: req.method,
         statusCode: res.statusCode,
@@ -43,11 +43,28 @@ const requestLogger = (req, res, next) => {
         ipAddress,
         userAgent: req.headers['user-agent'] || 'unknown',
         apiKeyId: req.apiKey?.id || null,
-        userId: req.user?.uid || null
+        userId: req.user?.id || null,
+        success: res.statusCode >= 200 && res.statusCode < 400
       };
 
-      // Log to Firestore (fire and forget, don't block response)
-      await db.collection('requestLogs').add(logData);
+      // Log to MySQL request_logs table (fire and forget, don't block response)
+      await query(
+        `INSERT INTO request_logs 
+        (timestamp, endpoint, method, statusCode, responseTime, ipAddress, userAgent, apiKeyId, userId, success) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          logData.timestamp,
+          logData.endpoint,
+          logData.method,
+          logData.statusCode,
+          logData.responseTime,
+          logData.ipAddress,
+          logData.userAgent,
+          logData.apiKeyId,
+          logData.userId,
+          logData.success
+        ]
+      );
     } catch (err) {
       console.error('Failed to log request:', err);
     }

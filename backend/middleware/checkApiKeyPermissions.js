@@ -5,7 +5,7 @@
  * stored permissions grant access to the requested HTTP Method and Resource Path.
  */
 
-const { db } = require('../config/firebase');
+const { query } = require('../config/db');
 
 /**
  * Permission mapping from HTTP methods to permission actions
@@ -156,14 +156,13 @@ const checkApiKeyPermissions = (options = {}) => {
         });
       }
 
-      // Look up the API key in Firestore
-      const keySnapshot = await db.collection('api_keys')
-        .where('key', '==', apiKey)
-        .where('isActive', '==', true)
-        .limit(1)
-        .get();
+      // Look up the API key in MySQL
+      const [keyResults] = await query(
+        'SELECT * FROM api_keys WHERE `key` = ? AND isActive = 1 LIMIT 1',
+        [apiKey]
+      );
 
-      if (keySnapshot.empty) {
+      if (!keyResults || keyResults.length === 0) {
         return res.status(401).json({
           success: false,
           error: 'Unauthorized',
@@ -171,14 +170,11 @@ const checkApiKeyPermissions = (options = {}) => {
         });
       }
 
-      const keyDoc = keySnapshot.docs[0];
-      const keyData = keyDoc.data();
+      const keyData = keyResults[0];
 
       // Check if key has expired
       if (keyData.expiresAt) {
-        const expirationDate = keyData.expiresAt.toDate ? 
-          keyData.expiresAt.toDate() : 
-          new Date(keyData.expiresAt);
+        const expirationDate = new Date(keyData.expiresAt);
         
         if (expirationDate < new Date()) {
           return res.status(401).json({
@@ -211,7 +207,7 @@ const checkApiKeyPermissions = (options = {}) => {
       }
 
       // Check if the key has the required permission
-      const permissions = keyData.permissions || [];
+      const permissions = keyData.permissions ? JSON.parse(keyData.permissions) : [];
 
       if (!hasPermission(permissions, requiredPermission)) {
         return res.status(403).json({
@@ -224,14 +220,14 @@ const checkApiKeyPermissions = (options = {}) => {
       }
 
       // Update last used timestamp (fire and forget)
-      db.collection('api_keys').doc(keyDoc.id).update({
-        lastUsedAt: new Date().toISOString(),
-        usageCount: (keyData.usageCount || 0) + 1
-      }).catch(err => console.error('Failed to update API key usage:', err));
+      query(
+        'UPDATE api_keys SET lastUsedAt = NOW(), usageCount = usageCount + 1 WHERE id = ?',
+        [keyData.id]
+      ).catch(err => console.error('Failed to update API key usage:', err));
 
       // Attach API key info to request
       req.apiKey = {
-        id: keyDoc.id,
+        id: keyData.id,
         name: keyData.name,
         permissions: permissions,
         createdBy: keyData.createdBy

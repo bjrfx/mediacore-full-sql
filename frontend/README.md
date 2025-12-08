@@ -47,7 +47,7 @@ A production-grade media streaming frontend built with React, TailwindCSS, and S
 ### Prerequisites
 - Node.js 18+ 
 - npm or yarn
-- Firebase project with Authentication enabled
+- MediaCore backend API running
 
 ### Installation
 
@@ -69,20 +69,11 @@ cp .env.example .env
 
 4. Update `.env` with your configuration:
 ```env
-REACT_APP_API_BASE_URL=https://your-api-url.com
+REACT_APP_API_BASE_URL=http://localhost:5001
 REACT_APP_API_KEY=your-public-api-key
 
-# Firebase Configuration
-REACT_APP_FIREBASE_API_KEY=your-firebase-api-key
-REACT_APP_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-REACT_APP_FIREBASE_PROJECT_ID=your-project-id
-REACT_APP_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-REACT_APP_FIREBASE_MESSAGING_SENDER_ID=123456789
-REACT_APP_FIREBASE_APP_ID=your-app-id
-REACT_APP_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
-
 # Admin Configuration
-REACT_APP_ADMIN_EMAIL=admin@example.com
+REACT_APP_ADMIN_EMAIL=admin@mediacore.com
 ```
 
 5. Start development server:

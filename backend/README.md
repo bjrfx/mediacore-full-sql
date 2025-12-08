@@ -1,36 +1,56 @@
 # MediaCore API
 
-A secure, role-based backend API built with Node.js (Express) for managing media content. Features Firebase Authentication for admins, a flexible API key permission system, and comprehensive analytics tracking.
+A secure, role-based backend API built with Node.js (Express) for managing media content. Features JWT authentication, MySQL database, API key permission system, and comprehensive analytics tracking.
 
 ## 🚀 Features
 
-- **Admin Authentication**: Firebase ID Token verification for secure admin access
-- **Role-Based API Keys**: Generate API keys with customizable permissions
+- **JWT Authentication**: Secure token-based authentication with automatic refresh
+- **MySQL Database**: Scalable relational database with 25+ tables
+- **Role-Based Access**: Admin and user roles with permission control
+- **API Keys**: Generate API keys with customizable permissions
 - **Media Upload**: Upload and manage video (.mp4) and audio (.mp3) files
-- **Firestore Integration**: Store metadata, API keys, and settings in Firebase Firestore
 - **Local File Storage**: Store media files on server disk (cPanel compatible)
 - **CORS Support**: Configurable cross-origin requests
 - **📊 Analytics Dashboard**: Track all API requests, response times, and usage patterns
+- **User Presence**: Real-time online user tracking
+- **Subscription Management**: User subscription and tier management
 
 ## 📁 Project Structure
 
 ```
 mediacore-api/
 ├── config/
-│   └── firebase.js              # Firebase Admin SDK initialization
+│   └── db.js                    # MySQL connection pool
+├── auth/
+│   ├── controllers.js           # Authentication endpoints
+│   ├── jwt.js                   # JWT token management
+│   └── password.js              # Password hashing utilities
 ├── middleware/
 │   ├── index.js                 # Middleware exports
-│   ├── checkAdminAuth.js        # Firebase auth middleware
+│   ├── checkAuth.js             # JWT verification middleware
+│   ├── checkAdminAuth.js        # Admin JWT verification
 │   ├── checkApiKeyPermissions.js # API key validation middleware
-│   └── analyticsTracker.js      # Request analytics tracking
+│   ├── analyticsTracker.js      # Request analytics tracking
+│   └── requestLogger.js         # Request logging middleware
+├── routes/
+│   ├── auth.js                  # Authentication routes
+│   ├── media.js                 # Media management routes
+│   └── artists.js               # Artist management routes
+├── data/
+│   └── dao.js                   # Database access objects
 ├── public/
 │   └── uploads/
 │       ├── video/               # Video file storage
-│       └── audio/               # Audio file storage
+│       ├── audio/               # Audio file storage
+│       └── journal/             # Journal entry storage
+├── scripts/
+│   ├── setup-mysql-schema.sql   # MySQL database schema
+│   └── migrate-language-fields.js # Language migration script
 ├── .env.example                 # Environment variables template
 ├── .gitignore
 ├── package.json
-├── server.js                    # Main application entry point
+├── app.js                       # cPanel Passenger entry point
+├── server.js                    # Main Express server
 └── README.md
 ```
 
@@ -49,13 +69,18 @@ mediacore-api/
    npm install
    ```
 
-3. **Configure environment variables**
+3. **Create MySQL database** (if not already created)
    ```bash
-   cp .env.example .env
-   # Edit .env with your Firebase credentials
+   mysql -u root -p < scripts/setup-mysql-schema.sql
    ```
 
-4. **Start the development server**
+4. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your MySQL credentials and JWT secret
+   ```
+
+5. **Start the development server**
    ```bash
    npm run dev
    ```
@@ -64,25 +89,34 @@ mediacore-api/
 
 1. **Upload files** to your cPanel hosting via File Manager or FTP
 
-2. **Create Node.js Application**
+2. **Set Up MySQL Database**
+   - Use phpMyAdmin to create database: `masakali_mediacore`
+   - Import `/scripts/setup-mysql-schema.sql`
+   - Verify admin user created: admin@mediacore.com / admin123
+
+3. **Create Node.js Application**
    - Go to cPanel → "Setup Node.js App"
    - Click "Create Application"
    - Select Node.js version (18+)
    - Set Application root to your project folder
    - Set Application URL
-   - Set Application startup file: `server.js`
+   - Set Application startup file: `app.js`
    - Click "Create"
 
-3. **Set Environment Variables**
-   - In the Node.js App settings, add your environment variables
-   - Most important: `FIREBASE_SERVICE_ACCOUNT_KEY`
-   - Set `NODE_ENV=production`
+4. **Set Environment Variables**
+   - In the Node.js App settings, add:
+     - `DB_HOST=sv63.ifastnet12.org`
+     - `DB_USER=masakali_kiran`
+     - `DB_PASSWORD=K143iran`
+     - `DB_NAME=masakali_mediacore`
+     - `JWT_SECRET=your-super-secret-key-min-32-chars`
+     - `NODE_ENV=production`
 
-4. **Install Dependencies**
+5. **Install Dependencies**
    - Click "Run NPM Install" in cPanel's Node.js app interface
-   - Or SSH into your server and run `npm install`
+   - Or SSH into your server and run `npm install --production`
 
-5. **Start/Restart the Application**
+6. **Start/Restart the Application**
    - Click "Run" or "Restart" in cPanel
 
 ## ⚙️ Environment Variables
@@ -90,14 +124,18 @@ mediacore-api/
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `PORT` | Server port (default: 5001) | No |
-| `NODE_ENV` | Environment mode | No |
+| `NODE_ENV` | Environment mode (development/production) | No |
+| `DB_HOST` | MySQL host | Yes |
+| `DB_USER` | MySQL username | Yes |
+| `DB_PASSWORD` | MySQL password | Yes |
+| `DB_NAME` | MySQL database name | Yes |
+| `DB_PORT` | MySQL port (default: 3306) | No |
+| `JWT_SECRET` | Secret key for JWT signing (min 32 chars) | Yes |
+| `JWT_ACCESS_EXPIRY` | Access token expiry (default: 15m) | No |
+| `JWT_REFRESH_EXPIRY` | Refresh token expiry (default: 7d) | No |
 | `CORS_ORIGIN` | Allowed CORS origins | No |
 | `UPLOAD_DIR` | Upload directory path | No |
 | `MAX_FILE_SIZE` | Max upload size in bytes | No |
-| `FIREBASE_SERVICE_ACCOUNT_KEY` | Full Firebase service account JSON | Yes* |
-| `FIREBASE_PROJECT_ID` | Firebase project ID | Yes* |
-| `FIREBASE_CLIENT_EMAIL` | Firebase service account email | Yes* |
-| `FIREBASE_PRIVATE_KEY` | Firebase private key | Yes* |
 
 *Either `FIREBASE_SERVICE_ACCOUNT_KEY` OR the individual Firebase variables are required.
 
