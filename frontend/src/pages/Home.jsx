@@ -64,7 +64,7 @@ export default function Home() {
       const albumInfo = item.albumId ? albumMap[item.albumId] : null;
       return {
         ...item,
-        artistName: albumInfo?.artistName || item.subtitle || '',
+        artistName: item.artistName || albumInfo?.artistName || item.subtitle || '',
         albumTitle: albumInfo?.title || '',
         albumCover: albumInfo?.coverImage || '',
       };

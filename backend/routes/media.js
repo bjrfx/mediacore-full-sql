@@ -151,20 +151,62 @@ router.get('/api/feed', checkApiKeyPermissions(), async (req, res) => {
       order = 'desc' 
     } = req.query;
     
-    const filters = {};
+    // Map camelCase orderBy to snake_case column names
+    const orderByMap = {
+      'createdAt': 'created_at',
+      'updatedAt': 'updated_at',
+      'title': 'title',
+      'duration': 'duration'
+    };
+    const dbOrderBy = orderByMap[orderBy] || 'created_at';
+    const dbOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
+    // Build query with artist join
+    let query = `
+      SELECT 
+        m.*,
+        a.name as artist_name
+      FROM media m
+      LEFT JOIN artists a ON m.artist_id = a.id
+      WHERE 1=1
+    `;
+    const params = [];
+    
     if (type && ['video', 'audio'].includes(type)) {
-      filters.type = type;
+      query += ' AND m.type = ?';
+      params.push(type);
     }
     if (language) {
-      filters.language = language;
+      query += ' AND m.language = ?';
+      params.push(language);
     }
     
-    const mediaList = await mediaDAO.getAll(
-      filters,
-      orderBy,
-      order,
-      parseInt(limit)
-    );
+    query += ` ORDER BY m.${dbOrderBy} ${dbOrder} LIMIT ?`;
+    params.push(parseInt(limit));
+    
+    const rows = await db.query(query, params);
+    
+    // Transform to camelCase and include artistName
+    const mediaList = rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      subtitle: row.subtitle || '',
+      artistName: row.artist_name || row.subtitle || '',
+      artistId: row.artist_id,
+      albumId: row.album_id,
+      description: row.description,
+      type: row.type,
+      language: row.language,
+      duration: row.duration,
+      fileUrl: row.file_path,
+      filePath: row.file_path,
+      fileSize: row.file_size,
+      thumbnailUrl: row.thumbnail_url,
+      contentGroupId: row.content_group_id,
+      subscriptionTier: row.subscription_tier,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }));
     
     res.json({
       success: true,
@@ -188,15 +230,48 @@ router.get('/api/feed', checkApiKeyPermissions(), async (req, res) => {
 router.get('/api/media/:id', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { id } = req.params;
-    const media = await mediaDAO.getById(id);
     
-    if (!media) {
+    // Get media with artist name
+    const query = `
+      SELECT 
+        m.*,
+        a.name as artist_name
+      FROM media m
+      LEFT JOIN artists a ON m.artist_id = a.id
+      WHERE m.id = ?
+    `;
+    const rows = await db.query(query, [id]);
+    const row = rows[0];
+    
+    if (!row) {
       return res.status(404).json({
         success: false,
         error: 'Not Found',
         message: 'Media content not found'
       });
     }
+    
+    // Transform to camelCase
+    const media = {
+      id: row.id,
+      title: row.title,
+      subtitle: row.subtitle || '',
+      artistName: row.artist_name || row.subtitle || '',
+      artistId: row.artist_id,
+      albumId: row.album_id,
+      description: row.description,
+      type: row.type,
+      language: row.language,
+      duration: row.duration,
+      fileUrl: row.file_path,
+      filePath: row.file_path,
+      fileSize: row.file_size,
+      thumbnailUrl: row.thumbnail_url,
+      contentGroupId: row.content_group_id,
+      subscriptionTier: row.subscription_tier,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
     
     // Get available languages if part of a content group
     if (media.contentGroupId) {
