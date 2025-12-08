@@ -14,6 +14,7 @@ const multer = require('multer');
 
 // Import MySQL DAO and middleware
 const { mediaDAO } = require('../data/dao');
+const db = require('../config/db');
 const { checkAuth, checkAdminAuth, checkApiKeyPermissions } = require('../middleware');
 
 // =============================================================================
@@ -393,25 +394,24 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     const relativePath = `/public/uploads/${type}/${file.filename}`;
     const fileUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
     
-    // Prepare media data
-    const mediaData = {
-      title,
-      subtitle: subtitle || '',
-      type,
-      language,
-      contentGroupId: finalContentGroupId,
-      filename: file.filename,
-      originalName: file.originalname,
-      filePath: relativePath,
-      fileUrl,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      uploadedBy: req.user.id,
-      uploadedByEmail: req.user.email
-    };
+    // Prepare media data  
+    const mediaId = uuidv4();
+    const result = await db.query(
+      `INSERT INTO media (id, title, subtitle, type, url, language, content_group_id, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        mediaId,
+        title,
+        subtitle || null,
+        type,
+        fileUrl,
+        language,
+        finalContentGroupId
+      ]
+    );
     
-    // Save to database
-    const media = await mediaDAO.create(mediaData);
+    // Fetch the created media
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
     
     res.status(201).json({
       success: true,
@@ -431,6 +431,57 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
       success: false,
       error: 'Internal Server Error',
       message: 'Failed to upload media'
+    });
+  }
+});
+
+/**
+ * GET /admin/media
+ * Get all media for admin panel (Admin only)
+ * Query: limit, offset, type, language
+ */
+router.get('/admin/media', checkAdminAuth, async (req, res) => {
+  try {
+    const { limit = 50, offset = 0, type, language } = req.query;
+    
+    let query = 'SELECT * FROM media WHERE 1=1';
+    const params = [];
+    
+    if (type) {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+    
+    if (language) {
+      query += ' AND language = ?';
+      params.push(language);
+    }
+    
+    // Get total count
+    const [countResult] = await db.query(
+      query.replace('SELECT *', 'SELECT COUNT(*) as count'),
+      params
+    );
+    const total = countResult[0]?.count || 0;
+    
+    // Get paginated results
+    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+    
+    const media = await db.query(query, params);
+    
+    res.json({
+      success: true,
+      count: media.length,
+      total,
+      data: media
+    });
+  } catch (error) {
+    console.error('Error fetching media:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to fetch media'
     });
   }
 });

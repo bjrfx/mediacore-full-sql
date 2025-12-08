@@ -183,7 +183,7 @@ router.post('/admin/artists', checkAdminAuth, async (req, res) => {
       name,
       bio: bio || '',
       image: image || '',
-      createdBy: req.user.id
+      createdBy: req.user.uid
     };
     
     const artist = await artistsDAO.create(artistData);

@@ -75,78 +75,86 @@ app.get('/api/settings', async (req, res) => {
 
 app.get('/api/user/subscription', checkAuth, async (req, res) => {
   try {
-    const [subscriptions] = await db.query('SELECT * FROM user_subscriptions WHERE userId = ? ORDER BY createdAt DESC LIMIT 1', [req.user.id]);
+    const subscriptions = await db.query('SELECT * FROM user_subscriptions WHERE uid = ? ORDER BY created_at DESC LIMIT 1', [req.user.uid]);
     if (subscriptions.length === 0) return res.json({ success: true, data: { plan: 'free', status: 'active' } });
     res.json({ success: true, data: subscriptions[0] });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error' });
+    console.error('Error fetching subscription:', error);
+    res.status(500).json({ success: false, message: 'Error fetching subscription' });
   }
 });
 
 app.get('/api/user/stats', checkAuth, async (req, res) => {
   try {
-    const [stats] = await db.query('SELECT * FROM user_stats WHERE userId = ?', [req.user.id]);
-    res.json({ success: true, data: stats[0] || { userId: req.user.id, totalPlays: 0 } });
+    const stats = await db.query('SELECT * FROM user_stats WHERE uid = ?', [req.user.uid]);
+    res.json({ success: true, data: stats[0] || { uid: req.user.uid, totalPlays: 0 } });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error' });
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ success: false, message: 'Error fetching stats' });
   }
 });
 
 app.post('/api/user/heartbeat', checkAuth, async (req, res) => {
   try {
-    await db.query('INSERT INTO user_presence (userId, lastSeen, status) VALUES (?, NOW(), ?) ON DUPLICATE KEY UPDATE lastSeen = NOW()', [req.user.id, 'online']);
+    await db.query('INSERT INTO user_presence (userId, last_seen, status) VALUES (?, NOW(), ?) ON DUPLICATE KEY UPDATE last_seen = NOW()', [req.user.uid, 'online']);
     res.json({ success: true });
   } catch (error) {
+    console.error('Error updating heartbeat:', error);
     res.status(500).json({ success: false });
   }
 });
 
 app.get('/admin/users', checkAdminAuth, async (req, res) => {
   try {
-    const [users] = await db.query('SELECT id, email, displayName, createdAt FROM users LIMIT 100');
+    const users = await db.query('SELECT uid, email, display_name, created_at FROM users LIMIT 100');
     res.json({ success: true, count: users.length, data: users });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, message: 'Error fetching users' });
   }
 });
 
 app.get('/admin/users/online', checkAdminAuth, async (req, res) => {
   try {
-    const [users] = await db.query('SELECT u.id, u.email, u.displayName, up.lastSeen FROM users u JOIN user_presence up ON u.id = up.userId WHERE up.lastSeen >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
+    const users = await db.query('SELECT u.uid, u.email, u.display_name, up.last_seen FROM users u JOIN user_presence up ON u.uid = up.userId WHERE up.last_seen >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
     res.json({ success: true, count: users.length, data: users });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Error fetching online users:', error);
+    res.status(500).json({ success: false, message: 'Error fetching users' });
   }
 });
 
 app.get('/admin/api-keys', checkAdminAuth, async (req, res) => {
   try {
-    const [keys] = await db.query('SELECT * FROM api_keys WHERE deletedAt IS NULL');
+    const keys = await db.query('SELECT * FROM api_keys WHERE is_active = 1');
     res.json({ success: true, count: keys.length, data: keys });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Error fetching API keys:', error);
+    res.status(500).json({ success: false, message: 'Error fetching API keys' });
   }
 });
 
 app.post('/admin/generate-key', checkAdminAuth, async (req, res) => {
   try {
     const crypto = require('crypto');
-    const apiKey = 'mk_' + crypto.randomBytes(32).toString('hex');
+    const apiKey = 'mc_' + crypto.randomBytes(32).toString('hex');
     const { name, accessType = 'read_only' } = req.body;
-    await db.query('INSERT INTO api_keys (apiKey, name, accessType, createdBy) VALUES (?, ?, ?, ?)', [apiKey, name || 'New Key', accessType, req.user.id]);
+    await db.query('INSERT INTO api_keys (api_key, name, access_type, created_by, created_at) VALUES (?, ?, ?, ?, NOW())', [apiKey, name || 'New Key', accessType, req.user.uid]);
     res.status(201).json({ success: true, data: { apiKey, name } });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Error generating API key:', error);
+    res.status(500).json({ success: false, message: 'Error generating key' });
   }
 });
 
 app.get('/admin/analytics/dashboard', checkAdminAuth, async (req, res) => {
   try {
-    const [totalUsers] = await db.query('SELECT COUNT(*) as count FROM users');
-    const [totalMedia] = await db.query('SELECT COUNT(*) as count FROM media');
-    res.json({ success: true, data: { totalUsers: totalUsers[0].count, totalMedia: totalMedia[0].count } });
+    const totalUsers = await db.queryOne('SELECT COUNT(*) as count FROM users');
+    const totalMedia = await db.queryOne('SELECT COUNT(*) as count FROM media');
+    res.json({ success: true, data: { totalUsers: totalUsers.count, totalMedia: totalMedia.count } });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Error fetching dashboard:', error);
+    res.status(500).json({ success: false, message: 'Error fetching dashboard' });
   }
 });
 
@@ -160,6 +168,100 @@ app.get('/admin/analytics/realtime', checkAdminAuth, async (req, res) => {
     res.json({ success: true, data: { onlineUsers: onlineUsers[0].count } });
   } catch (error) {
     res.status(500).json({ success: false });
+  }
+});
+
+// Additional admin endpoints
+app.get('/admin/users/:uid', checkAdminAuth, async (req, res) => {
+  try {
+    const user = await db.queryOne('SELECT uid, email, display_name, created_at, disabled FROM users WHERE uid = ?', [req.params.uid]);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    
+    const role = await db.queryOne('SELECT role FROM user_roles WHERE uid = ?', [req.params.uid]);
+    const subscription = await db.queryOne('SELECT subscription_tier FROM user_subscriptions WHERE uid = ?', [req.params.uid]);
+    
+    res.json({ success: true, data: { ...user, role: role?.role, subscriptionTier: subscription?.subscription_tier } });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ success: false, message: 'Error fetching user' });
+  }
+});
+
+app.put('/admin/users/:uid/role', checkAdminAuth, async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!['admin', 'user', 'moderator'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Invalid role' });
+    }
+    
+    const roleExists = await db.queryOne('SELECT role FROM user_roles WHERE uid = ?', [req.params.uid]);
+    if (roleExists) {
+      await db.query('UPDATE user_roles SET role = ? WHERE uid = ?', [role, req.params.uid]);
+    } else {
+      await db.query('INSERT INTO user_roles (uid, role) VALUES (?, ?)', [req.params.uid, role]);
+    }
+    
+    res.json({ success: true, message: 'User role updated' });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ success: false, message: 'Error updating role' });
+  }
+});
+
+app.put('/admin/users/:uid/status', checkAdminAuth, async (req, res) => {
+  try {
+    const { disabled } = req.body;
+    await db.query('UPDATE users SET disabled = ? WHERE uid = ?', [disabled ? 1 : 0, req.params.uid]);
+    res.json({ success: true, message: `User ${disabled ? 'disabled' : 'enabled'}` });
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    res.status(500).json({ success: false, message: 'Error updating status' });
+  }
+});
+
+app.delete('/admin/users/:uid', checkAdminAuth, async (req, res) => {
+  try {
+    // Don't delete, just disable
+    await db.query('UPDATE users SET disabled = 1 WHERE uid = ?', [req.params.uid]);
+    res.json({ success: true, message: 'User disabled' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ success: false, message: 'Error deleting user' });
+  }
+});
+
+app.put('/admin/users/:uid/subscription', checkAdminAuth, async (req, res) => {
+  try {
+    const { subscriptionTier } = req.body;
+    await db.query('UPDATE user_subscriptions SET subscription_tier = ? WHERE uid = ?', [subscriptionTier, req.params.uid]);
+    res.json({ success: true, message: 'Subscription updated' });
+  } catch (error) {
+    console.error('Error updating subscription:', error);
+    res.status(500).json({ success: false, message: 'Error updating subscription' });
+  }
+});
+
+app.delete('/admin/api-keys/:id', checkAdminAuth, async (req, res) => {
+  try {
+    await db.query('UPDATE api_keys SET is_active = 0 WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'API key deleted' });
+  } catch (error) {
+    console.error('Error deleting API key:', error);
+    res.status(500).json({ success: false, message: 'Error deleting key' });
+  }
+});
+
+app.get('/admin/analytics/subscriptions', checkAdminAuth, async (req, res) => {
+  try {
+    const stats = await db.query(`
+      SELECT subscription_tier, COUNT(*) as count 
+      FROM user_subscriptions 
+      GROUP BY subscription_tier
+    `);
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    console.error('Error fetching subscription stats:', error);
+    res.status(500).json({ success: false, message: 'Error fetching stats' });
   }
 });
 
