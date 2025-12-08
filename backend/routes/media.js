@@ -489,7 +489,25 @@ router.get('/admin/media', checkAdminAuth, async (req, res) => {
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
     
-    const media = await db.query(query, params);
+    const mediaResults = await db.query(query, params);
+    
+    // Transform snake_case to camelCase for frontend
+    const media = mediaResults.map(item => ({
+      id: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      type: item.type,
+      filePath: item.file_path,
+      thumbnailUrl: item.thumbnail_url,
+      fileSize: item.file_size,
+      duration: item.duration,
+      artistId: item.artist_id,
+      albumId: item.album_id,
+      language: item.language,
+      contentGroupId: item.content_group_id,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    }));
     
     res.json({
       success: true,
