@@ -97,9 +97,20 @@ app.get('/api/user/stats', checkAuth, async (req, res) => {
 
 app.post('/api/user/heartbeat', checkAuth, async (req, res) => {
   try {
+    const deviceType = req.headers['x-device-type'] || null;
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || null;
+
     await db.query(
-      'INSERT INTO user_presence (uid, is_online, last_active) VALUES (?, TRUE, NOW()) ON DUPLICATE KEY UPDATE is_online = TRUE, last_active = NOW()',
-      [req.user.uid]
+      `INSERT INTO user_presence (uid, is_online, last_active, device_type, ip_address, user_agent) 
+       VALUES (?, TRUE, NOW(), ?, ?, ?) 
+       ON DUPLICATE KEY UPDATE 
+         is_online = TRUE, 
+         last_active = NOW(), 
+         device_type = VALUES(device_type),
+         ip_address = VALUES(ip_address),
+         user_agent = VALUES(user_agent)`,
+      [req.user.uid, deviceType, ipAddress, userAgent]
     );
     res.json({ success: true });
   } catch (error) {
@@ -110,8 +121,36 @@ app.post('/api/user/heartbeat', checkAuth, async (req, res) => {
 
 app.get('/admin/users', checkAdminAuth, async (req, res) => {
   try {
-    const users = await db.query('SELECT uid, email, display_name, created_at FROM users LIMIT 100');
-    res.json({ success: true, count: users.length, data: users });
+    const users = await db.query(`
+      SELECT 
+        u.uid, 
+        u.email, 
+        u.display_name, 
+        u.email_verified, 
+        u.created_at,
+        ur.role,
+        us.subscription_tier
+      FROM users u
+      LEFT JOIN user_roles ur ON u.uid = ur.uid
+      LEFT JOIN user_subscriptions us ON u.uid = us.uid
+      LIMIT 100
+    `);
+    // Transform snake_case to camelCase for frontend
+    const transformedUsers = users.map(user => ({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.display_name,
+      emailVerified: user.email_verified === 1 || user.email_verified === true,
+      createdAt: user.created_at,
+      role: user.role || 'user',
+      subscriptionTier: user.subscription_tier || 'free',
+      disabled: false, // Add a disabled column to users table if needed
+      metadata: {
+        creationTime: user.created_at,
+        lastSignInTime: user.created_at // You can add a last_login column if needed
+      }
+    }));
+    res.json({ success: true, count: transformedUsers.length, data: { count: transformedUsers.length, users: transformedUsers } });
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ success: false, message: 'Error fetching users' });
@@ -121,9 +160,19 @@ app.get('/admin/users', checkAdminAuth, async (req, res) => {
 app.get('/admin/users/online', checkAdminAuth, async (req, res) => {
   try {
     const users = await db.query(
-      'SELECT u.uid, u.email, u.display_name, up.last_active FROM users u JOIN user_presence up ON u.uid = up.uid WHERE up.is_online = TRUE AND up.last_active >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
+      'SELECT u.uid, u.email, u.display_name, up.last_active, up.device_type, up.ip_address, up.user_agent FROM users u JOIN user_presence up ON u.uid = up.uid WHERE up.is_online = TRUE AND up.last_active >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
     );
-    res.json({ success: true, count: users.length, data: users });
+    // Transform snake_case to camelCase for frontend
+    const transformedUsers = users.map(user => ({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.display_name,
+      lastActive: user.last_active,
+      deviceType: user.device_type,
+      ipAddress: user.ip_address,
+      userAgent: user.user_agent
+    }));
+    res.json({ success: true, count: transformedUsers.length, data: { count: transformedUsers.length, users: transformedUsers } });
   } catch (error) {
     console.error('Error fetching online users:', error);
     res.status(500).json({ success: false, message: 'Error fetching users' });
