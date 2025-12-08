@@ -288,8 +288,29 @@ app.delete('/admin/users/:uid', checkAdminAuth, async (req, res) => {
 app.put('/admin/users/:uid/subscription', checkAdminAuth, async (req, res) => {
   try {
     const { subscriptionTier } = req.body;
-    await db.query('UPDATE user_subscriptions SET subscription_tier = ? WHERE uid = ?', [subscriptionTier, req.params.uid]);
-    res.json({ success: true, message: 'Subscription updated' });
+    const uid = req.params.uid;
+    
+    // First, check if user exists
+    const user = await db.query('SELECT uid FROM users WHERE uid = ?', [uid]);
+    if (user.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    // Insert or update subscription
+    await db.query(
+      `INSERT INTO user_subscriptions (uid, subscription_tier, updated_at) 
+       VALUES (?, ?, NOW()) 
+       ON DUPLICATE KEY UPDATE 
+         subscription_tier = VALUES(subscription_tier), 
+         updated_at = NOW()`,
+      [uid, subscriptionTier]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Subscription updated successfully',
+      data: { uid, subscriptionTier }
+    });
   } catch (error) {
     console.error('Error updating subscription:', error);
     res.status(500).json({ success: false, message: 'Error updating subscription' });

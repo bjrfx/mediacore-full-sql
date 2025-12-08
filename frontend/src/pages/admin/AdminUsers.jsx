@@ -205,6 +205,10 @@ export default function AdminUsers() {
         message: `Subscription updated to ${TIER_DISPLAY_NAMES[variables.subscriptionTier]}`,
         type: 'success',
       });
+      
+      // Trigger a refresh for all users (including the updated user if they're logged in)
+      window.dispatchEvent(new Event('refresh-subscription'));
+      console.log('[Admin] Triggered subscription refresh event for all users');
     },
     onError: (error) => {
       console.error('[Admin] Subscription update failed:', error);

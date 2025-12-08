@@ -14,8 +14,8 @@ import { SUBSCRIPTION_TIERS } from '../../config/subscription';
 // Heartbeat interval: 30 seconds
 const HEARTBEAT_INTERVAL = 30000;
 
-// Subscription refresh interval: 60 seconds (to pick up admin changes)
-const SUBSCRIPTION_REFRESH_INTERVAL = 60000;
+// Subscription refresh interval: 10 seconds (to pick up admin changes quickly)
+const SUBSCRIPTION_REFRESH_INTERVAL = 10000;
 
 /**
  * SubscriptionProvider
@@ -118,12 +118,22 @@ export default function SubscriptionProvider({ children }) {
       }
     };
 
+    // Listen for manual refresh requests (e.g., after admin updates)
+    const handleRefreshSubscription = () => {
+      if (isAuthenticated) {
+        console.log('[Subscription] Manual refresh requested, fetching subscription...');
+        fetchSubscription(true); // Force update
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('refresh-subscription', handleRefreshSubscription);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('refresh-subscription', handleRefreshSubscription);
     };
   }, [isAuthenticated, fetchSubscription]);
 
