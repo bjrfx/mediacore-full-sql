@@ -86,7 +86,7 @@ router.get('/api/artists/:id', checkApiKeyPermissions(), async (req, res) => {
 router.get('/api/artists/:id/albums', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { id } = req.params;
-    const { orderBy = 'releaseDate', order = 'desc' } = req.query;
+    const { orderBy = 'created_at', order = 'desc' } = req.query;
     
     // Verify artist exists
     const artist = await artistsDAO.getById(id);
@@ -98,18 +98,44 @@ router.get('/api/artists/:id/albums', checkApiKeyPermissions(), async (req, res)
       });
     }
     
+    // Map camelCase orderBy to snake_case
+    const orderByMap = {
+      'releaseDate': 'created_at',
+      'createdAt': 'created_at',
+      'name': 'name',
+      'title': 'name'
+    };
+    const dbOrderBy = orderByMap[orderBy] || 'created_at';
+    const dbOrder = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
     // Get albums for this artist using SQL query
-    const [albums] = await db.query(`
-      SELECT id, title, releaseDate, coverImage, artistId, createdAt, updatedAt
+    const albums = await db.query(`
+      SELECT id, name, artist_id, artist_name, cover_image_url, year, genre, description, created_at, updated_at
       FROM albums
-      WHERE artistId = ?
-      ORDER BY ${orderBy} ${order.toUpperCase()}
+      WHERE artist_id = ?
+      ORDER BY ${dbOrderBy} ${dbOrder}
     `, [id]);
+    
+    // Transform to camelCase for frontend
+    const transformedAlbums = albums.map(album => ({
+      id: album.id,
+      name: album.name,
+      title: album.name,
+      artistId: album.artist_id,
+      artistName: album.artist_name,
+      coverImage: album.cover_image_url,
+      coverImageUrl: album.cover_image_url,
+      year: album.year,
+      genre: album.genre,
+      description: album.description,
+      createdAt: album.created_at,
+      updatedAt: album.updated_at
+    }));
     
     res.json({
       success: true,
-      count: albums.length,
-      data: albums
+      count: transformedAlbums.length,
+      data: transformedAlbums
     });
   } catch (error) {
     console.error('Error fetching artist albums:', error);
@@ -141,12 +167,31 @@ router.get('/api/artists/:id/media', checkApiKeyPermissions(), async (req, res) 
       });
     }
     
-    const media = await artistsDAO.getMediaByArtist(id, type, orderBy, order);
+    const mediaList = await artistsDAO.getMediaByArtist(id, type);
+    
+    // Transform to camelCase for frontend
+    const transformedMedia = mediaList.map(item => ({
+      id: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      type: item.type,
+      fileUrl: item.file_path,
+      filePath: item.file_path,
+      fileSize: item.file_size,
+      thumbnailUrl: item.thumbnail_url,
+      duration: item.duration,
+      artistId: item.artist_id,
+      albumId: item.album_id,
+      language: item.language,
+      contentGroupId: item.content_group_id,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    }));
     
     res.json({
       success: true,
-      count: media.length,
-      data: media
+      count: transformedMedia.length,
+      data: transformedMedia
     });
   } catch (error) {
     console.error('Error fetching artist media:', error);

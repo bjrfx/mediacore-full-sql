@@ -133,9 +133,11 @@ router.get('/api/albums/:id/media', checkApiKeyPermissions(), async (req, res) =
  */
 router.post('/admin/albums', checkAdminAuth, async (req, res) => {
   try {
-    const { name, artistId, artistName, coverImageUrl, year, genre, description } = req.body;
+    // Accept both 'name' and 'title' for album name (frontend sends 'title')
+    const { name, title, artistId, artistName, coverImageUrl, year, genre, description } = req.body;
+    const albumName = name || title;
     
-    if (!name) {
+    if (!albumName) {
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
@@ -150,7 +152,7 @@ router.post('/admin/albums', checkAdminAuth, async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         albumId,
-        name,
+        albumName,
         artistId || null,
         artistName || null,
         coverImageUrl || null,

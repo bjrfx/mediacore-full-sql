@@ -355,12 +355,12 @@ router.get('/api/media/:id/download', checkAdminAuth, async (req, res) => {
 /**
  * POST /admin/media
  * Upload new media content (Admin only)
- * Body: title, subtitle, language, contentGroupId, type
+ * Body: title, subtitle, language, contentGroupId, type, artistId, albumId
  * File: multipart/form-data with 'file' field
  */
 router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, res) => {
   try {
-    const { title, subtitle, language = 'en', contentGroupId } = req.body;
+    const { title, subtitle, language = 'en', contentGroupId, artistId, albumId } = req.body;
     const file = req.file;
     
     // Get type from body, query, or detected type
@@ -401,8 +401,8 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     // Prepare media data  
     const mediaId = uuidv4();
     const result = await db.query(
-      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
         title,
@@ -410,7 +410,9 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
         fileUrl,
         language,
         finalContentGroupId,
-        fileSize
+        fileSize,
+        artistId || null,
+        albumId || null
       ]
     );
     
