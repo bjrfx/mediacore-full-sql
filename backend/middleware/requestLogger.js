@@ -50,10 +50,11 @@ const requestLogger = (req, res, next) => {
       // Log to MySQL request_logs table (fire and forget, don't block response)
       await query(
         `INSERT INTO request_logs 
-        (timestamp, endpoint, method, statusCode, responseTime, ipAddress, userAgent, apiKeyId, userId, success) 
+        (timestamp, endpoint, path, method, status_code, response_time, ip_address, user_agent, api_key_id, user_id) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           logData.timestamp,
+          logData.endpoint,
           logData.endpoint,
           logData.method,
           logData.statusCode,
@@ -61,8 +62,7 @@ const requestLogger = (req, res, next) => {
           logData.ipAddress,
           logData.userAgent,
           logData.apiKeyId,
-          logData.userId,
-          logData.success
+          logData.userId
         ]
       );
     } catch (err) {

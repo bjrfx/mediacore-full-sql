@@ -16,7 +16,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
-// Request logger
+// Request logger - logs to MySQL for analytics
+const requestLogger = require('./middleware/requestLogger');
+app.use(requestLogger);
+
+// Console logger
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
@@ -274,9 +278,103 @@ app.post('/admin/generate-key', checkAdminAuth, async (req, res) => {
 
 app.get('/admin/analytics/dashboard', checkAdminAuth, async (req, res) => {
   try {
+    // Basic counts
     const totalUsers = await db.queryOne('SELECT COUNT(*) as count FROM users');
     const totalMedia = await db.queryOne('SELECT COUNT(*) as count FROM media');
-    res.json({ success: true, data: { totalUsers: totalUsers.count, totalMedia: totalMedia.count } });
+    const totalVideos = await db.queryOne('SELECT COUNT(*) as count FROM media WHERE type = "video"');
+    const totalAudio = await db.queryOne('SELECT COUNT(*) as count FROM media WHERE type = "audio"');
+    const activeApiKeys = await db.queryOne('SELECT COUNT(*) as count FROM api_keys WHERE is_active = 1');
+    
+    // Get total requests from API keys usage_count
+    const totalRequestsResult = await db.queryOne('SELECT COALESCE(SUM(usage_count), 0) as count FROM api_keys');
+    const totalRequests = totalRequestsResult?.count || 0;
+    
+    // Get request logs for charts (last 7 days)
+    const dailyRequests = await db.query(`
+      SELECT 
+        DATE(timestamp) as date,
+        COUNT(*) as requests,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY DATE(timestamp)
+      ORDER BY date ASC
+    `);
+    
+    // Get top endpoints
+    const topEndpoints = await db.query(`
+      SELECT 
+        endpoint,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY endpoint
+      ORDER BY requests DESC
+      LIMIT 10
+    `);
+    
+    // Get recent activity
+    const recentActivity = await db.query(`
+      SELECT 
+        rl.id,
+        rl.timestamp,
+        rl.endpoint,
+        rl.method,
+        rl.status_code as statusCode,
+        ak.name as apiKeyName
+      FROM request_logs rl
+      LEFT JOIN api_keys ak ON rl.api_key_id = ak.id
+      ORDER BY rl.timestamp DESC
+      LIMIT 10
+    `);
+    
+    // Calculate success rate
+    const successRateResult = await db.queryOne(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    `);
+    const successRate = successRateResult?.total > 0 
+      ? ((successRateResult.successful / successRateResult.total) * 100).toFixed(1)
+      : 100;
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        totalUsers: totalUsers?.count || 0, 
+        totalMedia: totalMedia?.count || 0,
+        overview: {
+          totalUsers: totalUsers?.count || 0,
+          totalMedia: totalMedia?.count || 0,
+          totalVideos: totalVideos?.count || 0,
+          totalAudio: totalAudio?.count || 0,
+          activeApiKeys: activeApiKeys?.count || 0,
+          totalRequests,
+          successRate: parseFloat(successRate)
+        },
+        charts: {
+          dailyRequests: dailyRequests.map(row => ({
+            date: row.date,
+            requests: row.requests,
+            successful: row.successful
+          })),
+          topEndpoints: topEndpoints.map(row => ({
+            endpoint: row.endpoint,
+            requests: row.requests
+          }))
+        },
+        recentActivity: recentActivity.map(row => ({
+          id: row.id,
+          timestamp: row.timestamp,
+          endpoint: row.endpoint,
+          method: row.method,
+          statusCode: row.statusCode,
+          apiKeyName: row.apiKeyName
+        }))
+      } 
+    });
   } catch (error) {
     console.error('Error fetching dashboard:', error);
     res.status(500).json({ success: false, message: 'Error fetching dashboard' });
@@ -284,15 +382,88 @@ app.get('/admin/analytics/dashboard', checkAdminAuth, async (req, res) => {
 });
 
 app.get('/admin/analytics/summary', checkAdminAuth, async (req, res) => {
-  res.json({ success: true, data: { totalRequests: 0 } });
+  try {
+    const days = parseInt(req.query.days) || 30;
+    
+    // Get request stats for the period
+    const stats = await db.queryOne(`
+      SELECT 
+        COUNT(*) as totalRequests,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful,
+        AVG(response_time) as avgResponseTime
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+    `, [days]);
+    
+    // Get daily breakdown
+    const dailyRequests = await db.query(`
+      SELECT 
+        DATE(timestamp) as date,
+        COUNT(*) as requests,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY DATE(timestamp)
+      ORDER BY date ASC
+    `, [days]);
+    
+    // Get top endpoints
+    const topEndpoints = await db.query(`
+      SELECT 
+        endpoint,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY endpoint
+      ORDER BY requests DESC
+      LIMIT 10
+    `, [days]);
+    
+    const totalRequests = stats?.totalRequests || 0;
+    const successRate = totalRequests > 0 
+      ? ((stats.successful / totalRequests) * 100).toFixed(1)
+      : 100;
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        totalRequests,
+        successRate: parseFloat(successRate),
+        avgResponseTime: Math.round(stats?.avgResponseTime || 0),
+        charts: {
+          dailyRequests: dailyRequests.map(row => ({
+            date: row.date,
+            requests: row.requests,
+            successful: row.successful
+          })),
+          topEndpoints: topEndpoints.map(row => ({
+            endpoint: row.endpoint,
+            requests: row.requests
+          }))
+        }
+      } 
+    });
+  } catch (error) {
+    console.error('Error fetching analytics summary:', error);
+    res.status(500).json({ success: false, message: 'Error fetching analytics' });
+  }
 });
 
 app.get('/admin/analytics/realtime', checkAdminAuth, async (req, res) => {
   try {
-    const [onlineUsers] = await db.query('SELECT COUNT(*) as count FROM user_presence WHERE lastSeen >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
-    res.json({ success: true, data: { onlineUsers: onlineUsers[0].count } });
+    const onlineUsers = await db.queryOne('SELECT COUNT(*) as count FROM user_presence WHERE lastSeen >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
+    const recentRequests = await db.queryOne('SELECT COUNT(*) as count FROM request_logs WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)');
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        onlineUsers: onlineUsers?.count || 0,
+        recentRequests: recentRequests?.count || 0
+      } 
+    });
   } catch (error) {
-    res.status(500).json({ success: false });
+    console.error('Error fetching realtime stats:', error);
+    res.status(500).json({ success: false, message: 'Error fetching realtime stats' });
   }
 });
 
