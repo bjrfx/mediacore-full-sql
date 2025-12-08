@@ -108,9 +108,14 @@ const mediaDAO = {
  * ARTISTS Operations
  */
 const artistsDAO = {
-  async getAll(limit = 50) {
+  async getAll(orderBy = 'created_at', order = 'DESC', limit = 50) {
+    // Validate orderBy to prevent SQL injection
+    const validOrderFields = ['created_at', 'name', 'id'];
+    const orderField = validOrderFields.includes(orderBy) ? orderBy : 'created_at';
+    const orderDirection = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    
     return await db.query(
-      'SELECT * FROM artists ORDER BY created_at DESC LIMIT ?',
+      `SELECT * FROM artists ORDER BY ${orderField} ${orderDirection} LIMIT ?`,
       [parseInt(limit)]
     );
   },
@@ -135,11 +140,11 @@ const artistsDAO = {
   async create(artistData) {
     const id = artistData.id || require('uuid').v4();
     await db.query(
-      `INSERT INTO artists (id, name, bio, image_url, created_at, updated_at) 
+      `INSERT INTO artists (id, name, description, image_url, created_at, updated_at) 
        VALUES (?, ?, ?, ?, NOW(), NOW())`,
-      [id, artistData.name, artistData.bio || null, artistData.image_url || null]
+      [id, artistData.name, artistData.description || artistData.bio || null, artistData.image_url || artistData.image || null]
     );
-    return id;
+    return { id, ...artistData };
   },
 
   async update(id, updates) {

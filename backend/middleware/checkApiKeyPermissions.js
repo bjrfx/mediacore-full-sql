@@ -157,8 +157,8 @@ const checkApiKeyPermissions = (options = {}) => {
       }
 
       // Look up the API key in MySQL
-      const [keyResults] = await query(
-        'SELECT * FROM api_keys WHERE `key` = ? AND isActive = 1 LIMIT 1',
+      const keyResults = await query(
+        'SELECT * FROM api_keys WHERE `api_key` = ? AND is_active = 1 LIMIT 1',
         [apiKey]
       );
 
@@ -173,8 +173,8 @@ const checkApiKeyPermissions = (options = {}) => {
       const keyData = keyResults[0];
 
       // Check if key has expired
-      if (keyData.expiresAt) {
-        const expirationDate = new Date(keyData.expiresAt);
+      if (keyData.expires_at) {
+        const expirationDate = new Date(keyData.expires_at);
         
         if (expirationDate < new Date()) {
           return res.status(401).json({
@@ -221,7 +221,7 @@ const checkApiKeyPermissions = (options = {}) => {
 
       // Update last used timestamp (fire and forget)
       query(
-        'UPDATE api_keys SET lastUsedAt = NOW(), usageCount = usageCount + 1 WHERE id = ?',
+        'UPDATE api_keys SET last_used_at = NOW(), usage_count = usage_count + 1 WHERE id = ?',
         [keyData.id]
       ).catch(err => console.error('Failed to update API key usage:', err));
 
@@ -230,7 +230,7 @@ const checkApiKeyPermissions = (options = {}) => {
         id: keyData.id,
         name: keyData.name,
         permissions: permissions,
-        createdBy: keyData.createdBy
+        createdBy: keyData.created_by
       };
 
       next();

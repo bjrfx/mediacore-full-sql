@@ -394,19 +394,22 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     const relativePath = `/public/uploads/${type}/${file.filename}`;
     const fileUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
     
+    // Get file size and duration from file if available
+    const fileSize = file.size || 0;
+    
     // Prepare media data  
     const mediaId = uuidv4();
     const result = await db.query(
-      `INSERT INTO media (id, title, subtitle, type, url, language, content_group_id, created_at, updated_at) 
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, created_at, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
         title,
-        subtitle || null,
         type,
         fileUrl,
         language,
-        finalContentGroupId
+        finalContentGroupId,
+        fileSize
       ]
     );
     
