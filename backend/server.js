@@ -77,8 +77,28 @@ app.get('/api/settings', async (req, res) => {
 app.get('/api/user/subscription', checkAuth, async (req, res) => {
   try {
     const subscriptions = await db.query('SELECT * FROM user_subscriptions WHERE uid = ?', [req.user.uid]);
-    if (subscriptions.length === 0) return res.json({ success: true, data: { subscription_tier: 'free', status: 'active' } });
-    res.json({ success: true, data: subscriptions[0] });
+    if (subscriptions.length === 0) {
+      return res.json({ 
+        success: true, 
+        data: { 
+          subscriptionTier: 'free', 
+          status: 'active' 
+        } 
+      });
+    }
+    
+    // Transform snake_case to camelCase for frontend
+    const subscription = subscriptions[0];
+    res.json({ 
+      success: true, 
+      data: {
+        uid: subscription.uid,
+        subscriptionTier: subscription.subscription_tier,
+        status: subscription.status || 'active',
+        updatedAt: subscription.updated_at,
+        expiresAt: subscription.expires_at
+      }
+    });
   } catch (error) {
     console.error('Error fetching subscription:', error);
     res.status(500).json({ success: false, message: 'Error fetching subscription' });
@@ -359,6 +379,6 @@ app.use((err, req, res, next) => {
 // Database check
 db.query('SELECT 1').then(() => console.log('✅ MySQL connected')).catch(err => console.error('❌ MySQL failed:', err.message));
 
-console.log('📦 MediaCore API loaded - ZERO Firebase');
+console.log('📦 MediaCore API loaded');
 
 module.exports = app;

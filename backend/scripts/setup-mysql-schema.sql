@@ -55,7 +55,7 @@ CREATE TABLE `user_roles` (
 -- User subscriptions table (replaces Firestore user_subscriptions collection)
 CREATE TABLE `user_subscriptions` (
   `uid` VARCHAR(36) PRIMARY KEY,
-  `subscription_tier` ENUM('free', 'premium', 'enterprise') DEFAULT 'free',
+  `subscription_tier` ENUM('guest', 'free', 'premium', 'premium_plus', 'enterprise') DEFAULT 'free',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `expires_at` TIMESTAMP NULL DEFAULT NULL,
   FOREIGN KEY (`uid`) REFERENCES `users`(`uid`) ON DELETE CASCADE
