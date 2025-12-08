@@ -105,7 +105,20 @@ export default function AdminMedia() {
     },
   });
 
-  const allMedia = data?.data || [];
+  // Normalize media data: convert snake_case to camelCase for compatibility
+  const normalizeMedia = (item) => ({
+    ...item,
+    fileSize: item.fileSize ?? item.file_size ?? 0,
+    filePath: item.filePath ?? item.file_path ?? '',
+    thumbnailUrl: item.thumbnailUrl ?? item.thumbnail_url ?? item.thumbnail_path ?? '',
+    artistId: item.artistId ?? item.artist_id,
+    albumId: item.albumId ?? item.album_id,
+    contentGroupId: item.contentGroupId ?? item.content_group_id,
+    createdAt: item.createdAt ?? item.created_at,
+    updatedAt: item.updatedAt ?? item.updated_at,
+  });
+
+  const allMedia = (data?.data || []).map(normalizeMedia);
   
   // Apply type filter client-side
   const typeFilteredMedia = filter === 'all' 

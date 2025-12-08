@@ -7,6 +7,54 @@ const API_KEY = process.env.REACT_APP_PUBLIC_API_KEY || '';
 
 console.log('[API] Base URL:', API_BASE_URL);
 
+// ============================================
+// DATA NORMALIZATION HELPERS
+// ============================================
+
+/**
+ * Normalize media item from API response
+ * Converts snake_case to camelCase and ensures fileUrl is set
+ */
+const normalizeMediaItem = (item) => {
+  if (!item) return item;
+  return {
+    ...item,
+    // Convert snake_case to camelCase
+    fileUrl: item.fileUrl ?? item.file_path ?? item.filePath ?? '',
+    filePath: item.filePath ?? item.file_path ?? '',
+    fileSize: item.fileSize ?? item.file_size ?? 0,
+    thumbnailUrl: item.thumbnailUrl ?? item.thumbnail_url ?? item.thumbnail_path ?? '',
+    artistId: item.artistId ?? item.artist_id,
+    albumId: item.albumId ?? item.album_id,
+    contentGroupId: item.contentGroupId ?? item.content_group_id,
+    createdAt: item.createdAt ?? item.created_at,
+    updatedAt: item.updatedAt ?? item.updated_at,
+    uploadedAt: item.uploadedAt ?? item.uploaded_at,
+  };
+};
+
+/**
+ * Normalize media response (handles both single item and arrays)
+ */
+const normalizeMediaResponse = (response) => {
+  if (!response) return response;
+  
+  if (response.data) {
+    if (Array.isArray(response.data)) {
+      return {
+        ...response,
+        data: response.data.map(normalizeMediaItem),
+      };
+    } else {
+      return {
+        ...response,
+        data: normalizeMediaItem(response.data),
+      };
+    }
+  }
+  return response;
+};
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -109,7 +157,7 @@ export const publicApi = {
     const response = await api.get(`/api/feed?${params}`, {
       headers: { 'x-api-key': API_KEY },
     });
-    return response.data;
+    return normalizeMediaResponse(response.data);
   },
 
   // Get single media by ID
@@ -117,7 +165,7 @@ export const publicApi = {
     const response = await api.get(`/api/media/${id}`, {
       headers: { 'x-api-key': API_KEY },
     });
-    return response.data;
+    return normalizeMediaResponse(response.data);
   },
 
   // Get language variants for a content group
@@ -125,7 +173,7 @@ export const publicApi = {
     const response = await api.get(`/api/media/languages/${contentGroupId}`, {
       headers: { 'x-api-key': API_KEY },
     });
-    return response.data;
+    return normalizeMediaResponse(response.data);
   },
 
   // Get media by language
@@ -137,7 +185,7 @@ export const publicApi = {
     const response = await api.get(`/api/feed?${params}`, {
       headers: { 'x-api-key': API_KEY },
     });
-    return response.data;
+    return normalizeMediaResponse(response.data);
   },
 
   // Get available languages
