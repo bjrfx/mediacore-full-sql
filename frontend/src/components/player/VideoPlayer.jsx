@@ -14,6 +14,9 @@ import {
   Loader2,
   PictureInPicture,
   Heart,
+  Music,
+  Film,
+  Subtitles,
 } from 'lucide-react';
 import { usePlayerStore, useLibraryStore, useAuthStore } from '../../store';
 import { Button } from '../ui/button';
@@ -27,6 +30,8 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { cn, formatTime } from '../../lib/utils';
+import VideoSubtitles, { SubtitleSelector } from './VideoSubtitles';
+import LyricsDisplay from './LyricsDisplay';
 
 const PLAYBACK_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -59,6 +64,12 @@ export default function VideoPlayer({ onClose }) {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isBuffering, setIsBuffering] = useState(false);
   const [quality, setQuality] = useState('auto');
+  
+  // Video/Audio mode toggle - when audio mode, show Spotify-like lyrics
+  const [isAudioMode, setIsAudioMode] = useState(false);
+  
+  // Subtitle state from VideoSubtitles component
+  const [subtitleState, setSubtitleState] = useState(null);
 
   // Handle video events
   useEffect(() => {
@@ -179,6 +190,14 @@ export default function VideoPlayer({ onClose }) {
           e.preventDefault();
           toggleMute();
           break;
+        case 'j':
+          e.preventDefault();
+          seek(Math.max(0, progress - 10));
+          break;
+        case 'l':
+          e.preventDefault();
+          seek(Math.min(duration, progress + 10));
+          break;
         case 'arrowleft':
           e.preventDefault();
           seek(Math.max(0, progress - 10));
@@ -194,6 +213,13 @@ export default function VideoPlayer({ onClose }) {
         case 'arrowdown':
           e.preventDefault();
           setVolume(Math.max(0, volume - 0.1));
+          break;
+        case 'v':
+          // Toggle video/audio mode for video content
+          if (currentTrack?.type === 'video') {
+            e.preventDefault();
+            setIsAudioMode(prev => !prev);
+          }
           break;
         case 'escape':
           if (isFullscreen) {
@@ -219,11 +245,21 @@ export default function VideoPlayer({ onClose }) {
     volume,
     isFullscreen,
     onClose,
+    currentTrack?.type,
   ]);
 
   if (!currentTrack) return null;
 
   const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
+  const isVideoContent = currentTrack.type === 'video';
+
+  // Handle seeking from lyrics click
+  const handleLyricSeek = (time) => {
+    seek(time);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
 
   return (
     <motion.div
@@ -238,15 +274,88 @@ export default function VideoPlayer({ onClose }) {
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
-      {/* Video element */}
+      {/* Video element - hidden in audio mode for video content */}
       <video
         ref={videoRef}
         src={currentTrack.streamUrl || currentTrack.fileUrl}
-        className="w-full h-full object-contain"
+        className={cn(
+          'w-full h-full object-contain',
+          isAudioMode && isVideoContent && 'hidden'
+        )}
         poster={currentTrack.thumbnailUrl}
         onClick={togglePlayPause}
         playsInline
       />
+
+      {/* Audio mode lyrics display (Spotify-style) */}
+      {isAudioMode && isVideoContent && (
+        <div className="absolute inset-0 flex flex-col">
+          {/* Album art / thumbnail */}
+          <div className="flex-shrink-0 flex justify-center pt-8">
+            {currentTrack.thumbnailUrl ? (
+              <img
+                src={currentTrack.thumbnailUrl}
+                alt={currentTrack.title}
+                className="w-32 h-32 rounded-lg shadow-2xl object-cover"
+              />
+            ) : (
+              <div className="w-32 h-32 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                <Music className="h-16 w-16 text-primary/50" />
+              </div>
+            )}
+          </div>
+          {/* Lyrics display */}
+          <div className="flex-1 overflow-hidden">
+            <LyricsDisplay
+              mediaId={currentTrack.id}
+              currentTime={progress}
+              duration={duration}
+              onSeek={handleLyricSeek}
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Audio-only content - always show lyrics view */}
+      {!isVideoContent && (
+        <div className="absolute inset-0 flex flex-col bg-gradient-to-b from-card/50 to-black">
+          {/* Album art / thumbnail */}
+          <div className="flex-shrink-0 flex justify-center pt-8">
+            {currentTrack.thumbnailUrl ? (
+              <img
+                src={currentTrack.thumbnailUrl}
+                alt={currentTrack.title}
+                className="w-40 h-40 rounded-lg shadow-2xl object-cover"
+              />
+            ) : (
+              <div className="w-40 h-40 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center">
+                <Music className="h-20 w-20 text-primary/50" />
+              </div>
+            )}
+          </div>
+          {/* Lyrics display */}
+          <div className="flex-1 overflow-hidden">
+            <LyricsDisplay
+              mediaId={currentTrack.id}
+              currentTime={progress}
+              duration={duration}
+              onSeek={handleLyricSeek}
+              className="h-full"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Video subtitles overlay (YouTube-style) */}
+      {isVideoContent && !isAudioMode && (
+        <VideoSubtitles
+          mediaId={currentTrack.id}
+          currentTime={progress}
+          isVisible={true}
+          onSubtitlesChange={setSubtitleState}
+        />
+      )}
 
       {/* Buffering indicator */}
       <AnimatePresence>
@@ -407,6 +516,31 @@ export default function VideoPlayer({ onClose }) {
                     </Button>
                   )}
 
+                  {/* Video/Audio Mode Toggle (only for video content) */}
+                  {isVideoContent && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        'text-white hover:bg-white/20',
+                        isAudioMode && 'text-primary'
+                      )}
+                      onClick={() => setIsAudioMode(!isAudioMode)}
+                      title={isAudioMode ? 'Show Video' : 'Show Lyrics (Audio Mode)'}
+                    >
+                      {isAudioMode ? (
+                        <Film className="h-5 w-5" />
+                      ) : (
+                        <Music className="h-5 w-5" />
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Subtitle/CC Selector */}
+                  {isVideoContent && !isAudioMode && subtitleState?.hasSubtitles && (
+                    <SubtitleSelector subtitleState={subtitleState} />
+                  )}
+
                   {/* Settings */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -474,7 +608,7 @@ export default function VideoPlayer({ onClose }) {
 
             {/* Keyboard shortcuts hint */}
             <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 text-white/50 text-xs">
-              Space: Play/Pause • F: Fullscreen • M: Mute • ←→: Seek
+              Space: Play/Pause • F: Fullscreen • M: Mute • J/L: ±10s • V: Toggle Video/Audio
             </div>
           </motion.div>
         )}

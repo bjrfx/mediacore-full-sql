@@ -22,6 +22,8 @@ import {
   ChevronUp,
   Check,
   PlusCircle,
+  FileText,
+  Subtitles,
 } from 'lucide-react';
 import { publicApi, adminApi } from '../../services/api';
 import { useUIStore } from '../../store';
@@ -119,6 +121,12 @@ export default function AdminUpload() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [linkingFile, setLinkingFile] = useState(null);
   const [selectedContentGroup, setSelectedContentGroup] = useState('');
+
+  // Subtitle/Lyrics upload state
+  const [subtitleFile, setSubtitleFile] = useState(null);
+  const [subtitleLanguage, setSubtitleLanguage] = useState('en');
+  const [subtitleLabel, setSubtitleLabel] = useState('');
+  const [isDefaultSubtitle, setIsDefaultSubtitle] = useState(true);
 
   // Fetch artists from API
   const { data: artistsData } = useQuery({
@@ -223,6 +231,25 @@ export default function AdminUpload() {
         }
       }
 
+      // Upload subtitle if provided
+      if (mediaId && subtitleFile) {
+        try {
+          await adminApi.uploadSubtitle(mediaId, subtitleFile, {
+            language: subtitleLanguage,
+            label: subtitleLabel || undefined,
+            isDefault: isDefaultSubtitle,
+          });
+          queryClient.invalidateQueries(['subtitles', mediaId]);
+          addToast({ message: 'Subtitle uploaded successfully!', type: 'success' });
+        } catch (error) {
+          console.error('Failed to upload subtitle:', error);
+          addToast({
+            message: 'Media uploaded but subtitle upload failed: ' + (error.response?.data?.message || error.message),
+            type: 'warning',
+          });
+        }
+      }
+
       // Add to recent uploads
       const langInfo = LANGUAGES.find(l => l.code === language) || { name: language };
       setRecentUploads(prev => [{
@@ -256,6 +283,11 @@ export default function AdminUpload() {
     setSelectedArtistId('');
     setSelectedAlbumId('');
     setContentGroupId(null);
+    // Reset subtitle state
+    setSubtitleFile(null);
+    setSubtitleLanguage('en');
+    setSubtitleLabel('');
+    setIsDefaultSubtitle(true);
   };
 
   const resetMultiForm = () => {
@@ -304,6 +336,27 @@ export default function AdminUpload() {
       }
     }
   }, [title, addToast]);
+
+  // Handle subtitle file selection
+  const handleSubtitleFileChange = useCallback((e) => {
+    const selectedFile = e.target?.files?.[0];
+    if (selectedFile) {
+      const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+      if (['srt', 'vtt', 'txt'].includes(ext)) {
+        setSubtitleFile(selectedFile);
+        // Auto-generate label from filename if not set
+        if (!subtitleLabel) {
+          const name = selectedFile.name.replace(/\.[^/.]+$/, '');
+          setSubtitleLabel(name);
+        }
+      } else {
+        addToast({
+          message: 'Please upload a subtitle file (.srt, .vtt, or .txt)',
+          type: 'error',
+        });
+      }
+    }
+  }, [subtitleLabel, addToast]);
 
   // Handle file drop for multi-language upload
   const handleMultiFileDrop = useCallback((e, targetLanguage = null) => {
@@ -730,6 +783,130 @@ export default function AdminUpload() {
                       </p>
                     )}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Subtitle/Lyrics Upload (Optional) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Subtitles className="h-5 w-5" />
+                  Subtitles / Lyrics (Optional)
+                </CardTitle>
+                <CardDescription>
+                  Upload SRT, VTT for synced lyrics/subtitles, or TXT for plain text
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Subtitle file input */}
+                <div className="space-y-2">
+                  <Label>Subtitle/Lyrics File</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept=".srt,.vtt,.txt"
+                        onChange={handleSubtitleFileChange}
+                        className="hidden"
+                        id="subtitle-upload"
+                      />
+                      <label
+                        htmlFor="subtitle-upload"
+                        className={cn(
+                          'flex items-center gap-2 p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors',
+                          subtitleFile
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        )}
+                      >
+                        {subtitleFile ? (
+                          <>
+                            <FileText className="h-5 w-5 text-primary" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{subtitleFile.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {(subtitleFile.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setSubtitleFile(null);
+                                setSubtitleLabel('');
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              Click to upload .srt, .vtt, or .txt file
+                            </span>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {subtitleFile && (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Subtitle Language</Label>
+                        <Select value={subtitleLanguage} onValueChange={setSubtitleLanguage}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select language" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {LANGUAGES.map((lang) => (
+                              <SelectItem key={lang.code} value={lang.code}>
+                                <span className="flex items-center gap-2">
+                                  <Globe className="h-4 w-4" />
+                                  {lang.name} ({lang.nativeName})
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Display Label</Label>
+                        <Input
+                          placeholder="e.g., English, English (CC)"
+                          value={subtitleLabel}
+                          onChange={(e) => setSubtitleLabel(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="default-subtitle"
+                        checked={isDefaultSubtitle}
+                        onChange={(e) => setIsDefaultSubtitle(e.target.checked)}
+                        className="rounded border-input"
+                      />
+                      <Label htmlFor="default-subtitle" className="text-sm font-normal">
+                        Set as default subtitle track
+                      </Label>
+                    </div>
+
+                    <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                      <strong>Format tips:</strong>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li><strong>SRT/VTT:</strong> Time-synced subtitles for video, Spotify-style lyrics for audio</li>
+                        <li><strong>TXT:</strong> Plain text lyrics (displayed without sync)</li>
+                      </ul>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>

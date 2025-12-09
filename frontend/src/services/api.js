@@ -277,6 +277,33 @@ export const publicApi = {
     });
     return response.data;
   },
+
+  // ---- Subtitles/Lyrics ----
+
+  // Get all subtitles for a media item
+  getSubtitles: async (mediaId) => {
+    const response = await api.get(`/api/media/${mediaId}/subtitles`, {
+      headers: { 'x-api-key': API_KEY },
+    });
+    return response.data;
+  },
+
+  // Get subtitle content/info by ID
+  getSubtitleContent: async (subtitleId) => {
+    const response = await api.get(`/api/subtitles/${subtitleId}/content`, {
+      headers: { 'x-api-key': API_KEY },
+    });
+    return response.data;
+  },
+
+  // Fetch subtitle file content directly (for parsing)
+  fetchSubtitleFile: async (fileUrl) => {
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error('Failed to fetch subtitle file');
+    }
+    return response.text();
+  },
 };
 
 // ============================================
@@ -395,6 +422,48 @@ export const adminApi = {
       { tracks },
       { headers }
     );
+    return response.data;
+  },
+
+  // ---- Subtitle/Lyrics Management ----
+
+  // Upload subtitle file for a media item
+  uploadSubtitle: async (mediaId, file, options = {}) => {
+    const { language = 'en', label, isDefault = false, onProgress } = options;
+    const token = localStorage.getItem('accessToken');
+    
+    const formData = new FormData();
+    formData.append('subtitle', file);
+    formData.append('language', language);
+    if (label) formData.append('label', label);
+    formData.append('isDefault', isDefault.toString());
+
+    const response = await api.post(`/admin/media/${mediaId}/subtitles`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      },
+    });
+    return response.data;
+  },
+
+  // Update subtitle metadata
+  updateSubtitle: async (subtitleId, data) => {
+    const headers = await getAuthHeaders();
+    const response = await api.put(`/admin/subtitles/${subtitleId}`, data, { headers });
+    return response.data;
+  },
+
+  // Delete subtitle
+  deleteSubtitle: async (subtitleId) => {
+    const headers = await getAuthHeaders();
+    const response = await api.delete(`/admin/subtitles/${subtitleId}`, { headers });
     return response.data;
   },
 

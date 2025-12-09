@@ -38,12 +38,17 @@ const ALLOWED_MIME_TYPES = {
     'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav',
     'audio/wave', 'audio/x-m4a', 'audio/m4a', 'audio/mp4',
     'audio/aac', 'audio/x-aac', 'audio/ogg', 'audio/flac'
+  ],
+  subtitle: [
+    'text/plain', 'text/vtt', 'application/x-subrip',
+    'text/srt', 'application/octet-stream'
   ]
 };
 
 const ALLOWED_EXTENSIONS = {
   video: ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.mpeg', '.mpg'],
-  audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac']
+  audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'],
+  subtitle: ['.srt', '.vtt', '.txt']
 };
 
 // Ensure upload directory exists on server
@@ -103,6 +108,43 @@ const upload = multer({
   storage,
   fileFilter,
   limits: { fileSize: MAX_FILE_SIZE }
+});
+
+// Subtitle storage configuration
+const subtitleStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const subtitleDir = path.join(uploadPath, 'subtitles');
+    if (!fs.existsSync(subtitleDir)) {
+      fs.mkdirSync(subtitleDir, { recursive: true });
+    }
+    cb(null, subtitleDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `${Date.now()}_${uniqueId}${ext}`);
+  }
+});
+
+// Subtitle file filter
+const subtitleFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mimeType = file.mimetype.toLowerCase();
+  
+  const isValidSubtitle = ALLOWED_EXTENSIONS.subtitle.includes(ext) || 
+                          ALLOWED_MIME_TYPES.subtitle.includes(mimeType);
+  
+  if (isValidSubtitle) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Invalid subtitle file type. Allowed: ${ALLOWED_EXTENSIONS.subtitle.join(', ')}`), false);
+  }
+};
+
+const subtitleUpload = multer({
+  storage: subtitleStorage,
+  fileFilter: subtitleFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max for subtitles
 });
 
 // =============================================================================
@@ -672,6 +714,332 @@ router.delete('/admin/media/:id', checkAdminAuth, async (req, res) => {
       success: false,
       error: 'Internal Server Error',
       message: 'Failed to delete media'
+    });
+  }
+});
+
+// =============================================================================
+// SUBTITLE/LYRICS ROUTES
+// =============================================================================
+
+/**
+ * GET /api/media/:id/subtitles
+ * Get all subtitles/lyrics for a media item
+ */
+router.get('/api/media/:id/subtitles', checkApiKeyPermissions(), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if media exists
+    const media = await mediaDAO.getById(id);
+    if (!media) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media content not found'
+      });
+    }
+    
+    // Get all subtitles for this media
+    const subtitles = await db.query(
+      'SELECT * FROM subtitles WHERE media_id = ? ORDER BY is_default DESC, created_at ASC',
+      [id]
+    );
+    
+    // Transform to camelCase
+    const formattedSubtitles = subtitles.map(sub => ({
+      id: sub.id,
+      mediaId: sub.media_id,
+      language: sub.language,
+      format: sub.format,
+      label: sub.label,
+      fileUrl: sub.file_path,
+      isDefault: !!sub.is_default,
+      createdAt: sub.created_at,
+      updatedAt: sub.updated_at
+    }));
+    
+    res.json({
+      success: true,
+      count: formattedSubtitles.length,
+      data: formattedSubtitles
+    });
+  } catch (error) {
+    console.error('Error fetching subtitles:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to fetch subtitles'
+    });
+  }
+});
+
+/**
+ * GET /api/subtitles/:id/content
+ * Get subtitle file content (for parsing)
+ */
+router.get('/api/subtitles/:id/content', checkApiKeyPermissions(), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const subtitle = await db.queryOne('SELECT * FROM subtitles WHERE id = ?', [id]);
+    
+    if (!subtitle) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Subtitle not found'
+      });
+    }
+    
+    // Return subtitle info with file URL for frontend to fetch
+    res.json({
+      success: true,
+      data: {
+        id: subtitle.id,
+        mediaId: subtitle.media_id,
+        language: subtitle.language,
+        format: subtitle.format,
+        label: subtitle.label,
+        fileUrl: subtitle.file_path,
+        isDefault: !!subtitle.is_default
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching subtitle content:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to fetch subtitle content'
+    });
+  }
+});
+
+/**
+ * POST /admin/media/:id/subtitles
+ * Upload subtitle/lyrics file for a media item (Admin only)
+ * Body: language, label, isDefault
+ * File: multipart/form-data with 'subtitle' field
+ */
+router.post('/admin/media/:id/subtitles', checkAdminAuth, subtitleUpload.single('subtitle'), async (req, res) => {
+  try {
+    const { id: mediaId } = req.params;
+    const { language = 'en', label, isDefault = false } = req.body;
+    const file = req.file;
+    
+    // Check if media exists
+    const media = await mediaDAO.getById(mediaId);
+    if (!media) {
+      if (file && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media content not found'
+      });
+    }
+    
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'No subtitle file uploaded'
+      });
+    }
+    
+    // Determine format from file extension
+    const ext = path.extname(file.originalname).toLowerCase().slice(1);
+    const format = ['srt', 'vtt', 'txt'].includes(ext) ? ext : 'txt';
+    
+    // Construct file URL
+    const fileUrl = `${PRODUCTION_URL}/uploads/subtitles/${file.filename}`;
+    
+    // If setting as default, unset other defaults for this media
+    if (isDefault === true || isDefault === 'true') {
+      await db.query('UPDATE subtitles SET is_default = FALSE WHERE media_id = ?', [mediaId]);
+    }
+    
+    // Generate subtitle ID and insert
+    const subtitleId = uuidv4();
+    await db.query(
+      `INSERT INTO subtitles (id, media_id, language, format, label, file_path, is_default, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        subtitleId,
+        mediaId,
+        language,
+        format,
+        label || `${LANGUAGE_INFO[language]?.name || language} (${format.toUpperCase()})`,
+        fileUrl,
+        isDefault === true || isDefault === 'true'
+      ]
+    );
+    
+    // Fetch created subtitle
+    const subtitle = await db.queryOne('SELECT * FROM subtitles WHERE id = ?', [subtitleId]);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Subtitle uploaded successfully',
+      data: {
+        id: subtitle.id,
+        mediaId: subtitle.media_id,
+        language: subtitle.language,
+        format: subtitle.format,
+        label: subtitle.label,
+        fileUrl: subtitle.file_path,
+        isDefault: !!subtitle.is_default,
+        createdAt: subtitle.created_at,
+        updatedAt: subtitle.updated_at
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error uploading subtitle:', error);
+    
+    // Clean up file if it was uploaded
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to upload subtitle'
+    });
+  }
+});
+
+/**
+ * PUT /admin/subtitles/:id
+ * Update subtitle metadata (Admin only)
+ * Body: language, label, isDefault
+ */
+router.put('/admin/subtitles/:id', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { language, label, isDefault } = req.body;
+    
+    const subtitle = await db.queryOne('SELECT * FROM subtitles WHERE id = ?', [id]);
+    
+    if (!subtitle) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Subtitle not found'
+      });
+    }
+    
+    // If setting as default, unset other defaults for this media
+    if (isDefault === true || isDefault === 'true') {
+      await db.query('UPDATE subtitles SET is_default = FALSE WHERE media_id = ?', [subtitle.media_id]);
+    }
+    
+    // Build update query
+    const updates = [];
+    const values = [];
+    
+    if (language !== undefined) {
+      updates.push('language = ?');
+      values.push(language);
+    }
+    if (label !== undefined) {
+      updates.push('label = ?');
+      values.push(label);
+    }
+    if (isDefault !== undefined) {
+      updates.push('is_default = ?');
+      values.push(isDefault === true || isDefault === 'true');
+    }
+    
+    if (updates.length > 0) {
+      values.push(id);
+      await db.query(
+        `UPDATE subtitles SET ${updates.join(', ')}, updated_at = NOW() WHERE id = ?`,
+        values
+      );
+    }
+    
+    // Fetch updated subtitle
+    const updatedSubtitle = await db.queryOne('SELECT * FROM subtitles WHERE id = ?', [id]);
+    
+    res.json({
+      success: true,
+      message: 'Subtitle updated successfully',
+      data: {
+        id: updatedSubtitle.id,
+        mediaId: updatedSubtitle.media_id,
+        language: updatedSubtitle.language,
+        format: updatedSubtitle.format,
+        label: updatedSubtitle.label,
+        fileUrl: updatedSubtitle.file_path,
+        isDefault: !!updatedSubtitle.is_default,
+        createdAt: updatedSubtitle.created_at,
+        updatedAt: updatedSubtitle.updated_at
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error updating subtitle:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to update subtitle'
+    });
+  }
+});
+
+/**
+ * DELETE /admin/subtitles/:id
+ * Delete subtitle and file (Admin only)
+ */
+router.delete('/admin/subtitles/:id', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const subtitle = await db.queryOne('SELECT * FROM subtitles WHERE id = ?', [id]);
+    
+    if (!subtitle) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Subtitle not found'
+      });
+    }
+    
+    // Try to delete the physical file
+    if (subtitle.file_path) {
+      try {
+        // Extract filename from URL
+        const urlParts = subtitle.file_path.split('/');
+        const filename = urlParts[urlParts.length - 1];
+        const filePath = path.join(uploadPath, 'subtitles', filename);
+        
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`🗑️ Deleted subtitle file: ${filePath}`);
+        }
+      } catch (fileErr) {
+        console.error('Error deleting subtitle file:', fileErr);
+        // Continue with database deletion even if file deletion fails
+      }
+    }
+    
+    // Delete from database
+    await db.query('DELETE FROM subtitles WHERE id = ?', [id]);
+    
+    res.json({
+      success: true,
+      message: 'Subtitle deleted successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error deleting subtitle:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to delete subtitle'
     });
   }
 });

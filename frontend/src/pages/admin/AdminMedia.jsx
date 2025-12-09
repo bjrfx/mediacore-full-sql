@@ -11,6 +11,7 @@ import {
   List,
   Play,
   Eye,
+  Subtitles,
 } from 'lucide-react';
 import { publicApi, adminApi } from '../../services/api';
 import { useUIStore } from '../../store';
@@ -38,6 +39,7 @@ import {
 import { cn, formatDate, formatFileSize, generateGradient } from '../../lib/utils';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
+import { SubtitleManager } from '../../components/media';
 
 // Simple table components
 const SimpleTable = ({ children, className }) => (
@@ -69,6 +71,8 @@ export default function AdminMedia() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [mediaToDelete, setMediaToDelete] = useState(null);
   const [editForm, setEditForm] = useState({ title: '', subtitle: '' });
+  const [subtitleMediaId, setSubtitleMediaId] = useState(null);
+  const [subtitleMediaTitle, setSubtitleMediaTitle] = useState('');
 
   // Fetch media - always fetch all, then filter client-side
   // Backend may have issues with type filter parameter
@@ -314,6 +318,13 @@ export default function AdminMedia() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setSubtitleMediaId(media.id);
+                          setSubtitleMediaTitle(media.title);
+                        }}>
+                          <Subtitles className="mr-2 h-4 w-4" />
+                          Subtitles / Lyrics
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => handleDelete(media)}
@@ -352,6 +363,7 @@ export default function AdminMedia() {
                     size="icon"
                     variant="secondary"
                     onClick={() => window.open(media.fileUrl, '_blank')}
+                    title="Play"
                   >
                     <Play className="h-4 w-4" />
                   </Button>
@@ -359,13 +371,26 @@ export default function AdminMedia() {
                     size="icon"
                     variant="secondary"
                     onClick={() => handleEdit(media)}
+                    title="Edit"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     size="icon"
+                    variant="secondary"
+                    onClick={() => {
+                      setSubtitleMediaId(media.id);
+                      setSubtitleMediaTitle(media.title);
+                    }}
+                    title="Subtitles / Lyrics"
+                  >
+                    <Subtitles className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
                     variant="destructive"
                     onClick={() => handleDelete(media)}
+                    title="Delete"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -467,6 +492,17 @@ export default function AdminMedia() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Subtitle Manager Dialog */}
+      <SubtitleManager
+        mediaId={subtitleMediaId}
+        mediaTitle={subtitleMediaTitle}
+        isOpen={!!subtitleMediaId}
+        onClose={() => {
+          setSubtitleMediaId(null);
+          setSubtitleMediaTitle('');
+        }}
+      />
     </div>
   );
 }
