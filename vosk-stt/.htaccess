@@ -1,0 +1,63 @@
+# Apache configuration for Vosk STT
+# This file is used by cPanel Passenger
+
+# Pass through to Passenger
+PassengerEnabled on
+PassengerAppRoot /home/masakali/vosk-stt
+PassengerAppType wsgi
+PassengerStartupFile passenger_wsgi.py
+
+# Increase timeouts for long processing
+TimeOut 600
+
+# Increase upload limits
+LimitRequestBody 524288000
+
+# CORS headers (in case Passenger doesn't set them)
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, X-API-Key, Authorization"
+    Header always set Access-Control-Expose-Headers "Content-Range, Accept-Ranges"
+</IfModule>
+
+# Handle OPTIONS preflight
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=200,L]
+
+# Deny access to sensitive files
+<FilesMatch "\.(env|py|pyc|log)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Allow access to specific Python files
+<Files "passenger_wsgi.py">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# Protect directories
+<DirectoryMatch "^/.*/\.(git|svn)/">
+    Deny from all
+</DirectoryMatch>
+
+# Serve static files directly
+<Directory "/home/masakali/vosk-stt/static">
+    Options -Indexes
+    AllowOverride None
+    Require all granted
+</Directory>
+
+# Serve subtitle files
+<Directory "/home/masakali/vosk-stt/subtitles">
+    Options -Indexes
+    AllowOverride None
+    Require all granted
+    
+    # Set proper MIME types
+    AddType text/plain .srt
+    AddType text/vtt .vtt
+    AddType application/json .json
+</Directory>
