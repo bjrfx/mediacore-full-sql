@@ -18,10 +18,10 @@ class Config:
     DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
     
     # MySQL Database
-    MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+    MYSQL_HOST = os.getenv('MYSQL_HOST', 'sv63.ifastnet12.org')
     MYSQL_PORT = int(os.getenv('MYSQL_PORT', 3306))
-    MYSQL_USER = os.getenv('MYSQL_USER', 'root')
-    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', '')
+    MYSQL_USER = os.getenv('MYSQL_USER', 'masakali_kiran')
+    MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD', 'K143iran')
     MYSQL_DATABASE = os.getenv('MYSQL_DATABASE', 'masakali_mediacore')
     
     # SQLAlchemy
