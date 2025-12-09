@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Heart,
   Share2,
@@ -20,7 +20,6 @@ import {
   VolumeX,
   ChevronDown,
   Music,
-  Subtitles,
 } from 'lucide-react';
 import { publicApi } from '../services/api';
 import { usePlayerStore, useLibraryStore, useAuthStore } from '../store';
@@ -35,13 +34,11 @@ import {
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import { cn, formatDuration, formatDate } from '../lib/utils';
-import { LyricsDisplay } from '../components/player';
 
 export default function MediaPlayer() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [showLyrics, setShowLyrics] = useState(false);
   const {
     currentTrack,
     isPlaying,
@@ -365,42 +362,6 @@ export default function MediaPlayer() {
             </p>
           </div>
         )}
-
-        {/* Lyrics Toggle Button */}
-        {media && (media.type === 'audio' || media.mediaType === 'audio') && (
-          <div className="mt-6">
-            <Button
-              variant="outline"
-              className={cn(
-                "border-white/20 hover:bg-white/10",
-                showLyrics && "bg-spotify-green/20 border-spotify-green text-spotify-green"
-              )}
-              onClick={() => setShowLyrics(!showLyrics)}
-            >
-              <Subtitles className="h-4 w-4 mr-2" />
-              {showLyrics ? 'Hide Lyrics' : 'Show Lyrics'}
-            </Button>
-          </div>
-        )}
-
-        {/* Lyrics Display */}
-        <AnimatePresence>
-          {showLyrics && media && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="w-full max-w-2xl mt-6"
-            >
-              <LyricsDisplay
-                mediaId={media.id}
-                currentTime={progress}
-                isPlaying={isPlaying}
-                onClose={() => setShowLyrics(false)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </motion.div>
   );

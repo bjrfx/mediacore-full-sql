@@ -17,9 +17,6 @@ const { mediaDAO } = require('../data/dao');
 const db = require('../config/db');
 const { checkAuth, checkAdminAuth, checkApiKeyPermissions } = require('../middleware');
 
-// Import STT service for subtitle generation
-const sttService = require('../services/sttService');
-
 // =============================================================================
 // MULTER CONFIGURATION FOR FILE UPLOADS
 // =============================================================================
@@ -426,157 +423,6 @@ router.get('/api/media/:id/download', checkAdminAuth, async (req, res) => {
   }
 });
 
-/**
- * GET /api/media/:id/subtitles
- * Get subtitles/lyrics for a media item (Spotify-style sync)
- */
-router.get('/api/media/:id/subtitles', checkApiKeyPermissions(), async (req, res) => {
-  try {
-    const { id } = req.params;
-    const format = req.query.format || 'json'; // json, srt, vtt
-    
-    // First check if media exists and has subtitles
-    const media = await db.queryOne(
-      'SELECT id, has_subtitles, subtitle_id, subtitle_status FROM media WHERE id = ?',
-      [id]
-    );
-    
-    if (!media) {
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: 'Media not found'
-      });
-    }
-    
-    // Check subtitle status
-    if (media.subtitle_status === 'processing') {
-      return res.json({
-        success: true,
-        status: 'processing',
-        message: 'Subtitles are still being generated'
-      });
-    }
-    
-    if (media.subtitle_status === 'failed' || !media.has_subtitles) {
-      return res.json({
-        success: true,
-        status: 'unavailable',
-        message: 'Subtitles not available for this media'
-      });
-    }
-    
-    // Get subtitles from STT service
-    const subtitleResult = await sttService.getSubtitles(id);
-    
-    if (!subtitleResult.success) {
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: 'Subtitles not found'
-      });
-    }
-    
-    // Return based on requested format
-    if (format === 'json') {
-      res.json({
-        success: true,
-        status: 'available',
-        data: subtitleResult.data
-      });
-    } else {
-      // Redirect to subtitle file
-      const filePath = format === 'vtt' 
-        ? subtitleResult.data.vtt_path 
-        : subtitleResult.data.subtitle_path;
-      
-      res.json({
-        success: true,
-        status: 'available',
-        url: filePath
-      });
-    }
-    
-  } catch (error) {
-    console.error('Error fetching subtitles:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal Server Error',
-      message: 'Failed to fetch subtitles'
-    });
-  }
-});
-
-/**
- * POST /api/media/:id/generate-subtitles
- * Manually trigger subtitle generation for a media item
- */
-router.post('/api/media/:id/generate-subtitles', checkAdminAuth, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { language } = req.body;
-    
-    // Get media
-    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [id]);
-    
-    if (!media) {
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: 'Media not found'
-      });
-    }
-    
-    // Update status to processing
-    await db.query(
-      `UPDATE media SET subtitle_status = 'processing' WHERE id = ?`,
-      [id]
-    );
-    
-    // Trigger transcription
-    const fileUrl = media.file_path;
-    const lang = language || media.language || 'en';
-    
-    // Non-blocking
-    sttService.requestTranscription(id, fileUrl, lang)
-      .then(async (result) => {
-        if (result.success) {
-          await db.query(
-            `UPDATE media SET 
-              has_subtitles = 1, 
-              subtitle_id = ?, 
-              subtitle_status = 'completed',
-              updated_at = NOW()
-            WHERE id = ?`,
-            [result.subtitleId, id]
-          );
-        } else {
-          await db.query(
-            `UPDATE media SET subtitle_status = 'failed' WHERE id = ?`,
-            [id]
-          );
-        }
-      })
-      .catch(() => {
-        db.query(`UPDATE media SET subtitle_status = 'failed' WHERE id = ?`, [id]);
-      });
-    
-    res.json({
-      success: true,
-      message: 'Subtitle generation started',
-      status: 'processing'
-    });
-    
-  } catch (error) {
-    console.error('Error triggering subtitle generation:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Internal Server Error',
-      message: 'Failed to start subtitle generation'
-    });
-  }
-});
-
 // =============================================================================
 // ADMIN ROUTES - MEDIA CRUD
 // =============================================================================
@@ -648,57 +494,10 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     // Fetch the created media
     const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
     
-    // Trigger subtitle generation asynchronously (don't wait for completion)
-    // This will process in the background
-    const generateSubtitles = req.body.generateSubtitles !== 'false';
-    if (generateSubtitles) {
-      console.log(`[Media Upload] Triggering subtitle generation for ${mediaId}`);
-      
-      // Non-blocking subtitle generation
-      sttService.requestTranscription(mediaId, fileUrl, language)
-        .then(async (sttResult) => {
-          if (sttResult.success) {
-            // Update media record with subtitle info
-            await db.query(
-              `UPDATE media SET 
-                has_subtitles = 1, 
-                subtitle_id = ?, 
-                subtitle_status = 'completed',
-                updated_at = NOW()
-              WHERE id = ?`,
-              [sttResult.subtitleId, mediaId]
-            );
-            console.log(`[Media Upload] Subtitles generated for ${mediaId}: ${sttResult.lineCount} lines`);
-          } else {
-            // Update status to failed
-            await db.query(
-              `UPDATE media SET 
-                subtitle_status = 'failed',
-                updated_at = NOW()
-              WHERE id = ?`,
-              [mediaId]
-            );
-            console.error(`[Media Upload] Subtitle generation failed for ${mediaId}: ${sttResult.message}`);
-          }
-        })
-        .catch((err) => {
-          console.error(`[Media Upload] Subtitle service error for ${mediaId}:`, err.message);
-        });
-      
-      // Update status to processing
-      await db.query(
-        `UPDATE media SET subtitle_status = 'processing' WHERE id = ?`,
-        [mediaId]
-      );
-    }
-    
     res.status(201).json({
       success: true,
       message: 'Media uploaded successfully',
-      data: {
-        ...media,
-        subtitleStatus: generateSubtitles ? 'processing' : null
-      }
+      data: media
     });
     
   } catch (error) {

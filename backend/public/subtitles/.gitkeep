@@ -1,8 +1,0 @@
-# Subtitles Directory
-
-This folder stores generated subtitle files:
-- `.srt` - SubRip format
-- `.vtt` - WebVTT format (for HTML5 video)
-- `.json` - JSON format for Spotify-like lyrics display
-
-Files are named by media ID: `{mediaId}.srt`, `{mediaId}.vtt`, `{mediaId}.json`

@@ -86,23 +86,6 @@ app.use(artistsRoutes);
 const albumsRoutes = require('./routes/albums');
 app.use(albumsRoutes);
 
-const subtitlesRoutes = require('./routes/subtitles');
-app.use('/api/subtitles', subtitlesRoutes);
-
-// Static subtitles files
-app.use('/subtitles', express.static(path.join(__dirname, 'public', 'subtitles'), {
-  maxAge: '1h',
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.vtt')) {
-      res.set('Content-Type', 'text/vtt');
-    } else if (filePath.endsWith('.srt')) {
-      res.set('Content-Type', 'text/plain');
-    } else if (filePath.endsWith('.json')) {
-      res.set('Content-Type', 'application/json');
-    }
-  }
-}));
-
 // Stubs
 const { checkAuth, checkAdminAuth } = require('./middleware');
 

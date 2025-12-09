@@ -47,7 +47,6 @@ const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'));
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
 const AdminArtists = lazy(() => import('./pages/admin/AdminArtists'));
 const AdminArtistDetail = lazy(() => import('./pages/admin/AdminArtistDetail'));
-const AdminSubtitles = lazy(() => import('./pages/admin/AdminSubtitles'));
 
 // Create Query Client
 const queryClient = new QueryClient({
@@ -124,7 +123,6 @@ function AppRoutes() {
             <Route path="upload" element={<AdminUpload />} />
             <Route path="artists" element={<AdminArtists />} />
             <Route path="artists/:artistId" element={<AdminArtistDetail />} />
-            <Route path="subtitles" element={<AdminSubtitles />} />
             <Route path="api-keys" element={<AdminApiKeys />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="click-stream" element={<AdminClickStream />} />

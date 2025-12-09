@@ -12,7 +12,6 @@ import {
   Users,
   Music,
   Activity,
-  Subtitles,
 } from 'lucide-react';
 import { useAuthStore } from '../../store';
 import { Button } from '../../components/ui/button';
@@ -23,7 +22,6 @@ const adminNavItems = [
   { icon: Film, label: 'Media', path: '/admin/media' },
   { icon: Music, label: 'Artists', path: '/admin/artists' },
   { icon: Upload, label: 'Upload', path: '/admin/upload' },
-  { icon: Subtitles, label: 'Subtitles', path: '/admin/subtitles' },
   { icon: Users, label: 'Users', path: '/admin/users' },
   { icon: Key, label: 'API Keys', path: '/admin/api-keys' },
   { icon: BarChart3, label: 'Analytics', path: '/admin/analytics' },
