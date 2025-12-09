@@ -114,13 +114,18 @@ export default function LyricsDisplay({
     
     // Scroll when index changes OR when scrubbing
     if (indexChanged || isScrubbing) {
-      // Calculate scroll position to center the active element
-      const containerHeight = container.clientHeight;
-      const elementTop = element.offsetTop;
-      const elementHeight = element.offsetHeight;
+      // Get the element's position relative to the scrollable container
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
       
-      // Target position: center the element in the container
-      const targetScrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
+      // Calculate where the element currently is relative to container's viewport
+      const elementRelativeTop = elementRect.top - containerRect.top;
+      const containerCenter = containerRect.height / 2;
+      const elementCenter = elementRect.height / 2;
+      
+      // How much we need to scroll to center the element
+      const scrollOffset = elementRelativeTop - containerCenter + elementCenter;
+      const targetScrollTop = container.scrollTop + scrollOffset;
       
       // Use instant scroll for scrubbing, smooth for normal playback
       container.scrollTo({
@@ -204,7 +209,8 @@ export default function LyricsDisplay({
       {/* Lyrics content */}
       <div
         ref={lyricsContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-6 scrollbar-hide"
+        className="flex-1 overflow-y-auto px-4 scrollbar-hide"
+        style={{ scrollBehavior: 'smooth' }}
       >
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -216,35 +222,46 @@ export default function LyricsDisplay({
             <p className="text-muted-foreground">Could not load lyrics</p>
           </div>
         ) : parsedLyrics.hasTimestamps ? (
-          // Synced lyrics (SRT/VTT)
-          <div className="space-y-4 pt-[30%] pb-[50%]">
+          // Synced lyrics (SRT/VTT) - with padding to allow centering first/last items
+          <div className="space-y-6 py-[50vh]">
             {parsedLyrics.cues.map((cue, index) => {
               const isActive = index === currentIndex;
               const isPast = currentIndex > -1 && index < currentIndex;
-              const isFuture = currentIndex > -1 && index > currentIndex;
-
+              const distance = Math.abs(index - currentIndex);
+              
+              // Calculate blur based on distance from active line
+              const blurAmount = isActive ? 0 : Math.min(distance * 0.5, 2);
+              
               return (
                 <motion.div
                   key={cue.id}
                   ref={(el) => {
                     if (el) lyricRefs.current[index] = el;
                   }}
-                  initial={{ opacity: 0.5, scale: 0.95 }}
+                  initial={{ opacity: 0.3, scale: 0.9, filter: 'blur(2px)' }}
                   animate={{
-                    opacity: isActive ? 1 : isPast ? 0.4 : 0.6,
-                    scale: isActive ? 1 : 0.95,
+                    opacity: isActive ? 1 : isPast ? 0.35 : 0.5,
+                    scale: isActive ? 1.05 : 1,
+                    filter: `blur(${blurAmount}px)`,
+                    y: 0,
                   }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ 
+                    duration: 0.4, 
+                    ease: [0.25, 0.1, 0.25, 1],
+                    filter: { duration: 0.3 }
+                  }}
                   className={cn(
-                    'cursor-pointer transition-all duration-300 py-2 px-3 rounded-lg text-center',
+                    'cursor-pointer py-3 px-4 rounded-xl text-center transition-colors duration-300',
                     isActive
-                      ? 'text-primary font-semibold text-2xl md:text-3xl'
+                      ? 'text-primary font-bold text-xl sm:text-2xl md:text-3xl lg:text-4xl'
                       : isPast
-                      ? 'text-muted-foreground text-lg md:text-xl'
-                      : 'text-foreground/70 text-lg md:text-xl hover:text-foreground',
-                    onSeek && 'hover:bg-accent/50'
+                      ? 'text-muted-foreground/60 text-base sm:text-lg md:text-xl'
+                      : 'text-foreground/50 text-base sm:text-lg md:text-xl',
+                    'hover:bg-white/5 active:bg-white/10'
                   )}
                   onClick={() => handleLyricClick(cue)}
+                  whileHover={{ scale: isActive ? 1.05 : 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   {cue.text}
                 </motion.div>
