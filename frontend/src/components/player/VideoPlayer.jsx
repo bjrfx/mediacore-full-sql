@@ -285,8 +285,6 @@ export default function VideoPlayer({ onClose }) {
         poster={currentTrack.thumbnailUrl}
         onClick={togglePlayPause}
         playsInline
-        preload="metadata"
-        crossOrigin="anonymous"
       />
 
       {/* Audio mode lyrics display (Spotify-style) */}
