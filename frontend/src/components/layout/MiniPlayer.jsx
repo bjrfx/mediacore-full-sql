@@ -28,6 +28,7 @@ import {
   Rewind,
   FastForward,
   WifiOff,
+  Subtitles,
 } from 'lucide-react';
 import { cn, formatDuration } from '../../lib/utils';
 import { usePlayerStore, useLibraryStore, useDownloadStore } from '../../store';
@@ -48,6 +49,7 @@ import {
   DropdownMenuSubTrigger,
 } from '../ui/dropdown-menu';
 import LanguageSelector from '../player/LanguageSelector';
+import { LyricsDisplay } from '../player';
 
 const PLAYBACK_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -58,6 +60,7 @@ function MiniPlayer() {
   const [seeking, setSeeking] = useState(false);
   const [seekValue, setSeekValue] = useState(0);
   const [playbackError, setPlaybackError] = useState(null);
+  const [showLyrics, setShowLyrics] = useState(true);
   const lastTrackIdRef = useRef(null);
   const lastTimeUpdateRef = useRef(0);
 
@@ -552,23 +555,49 @@ function MiniPlayer() {
             )}
           </AnimatePresence>
 
-          {/* Audio mode - show album art */}
+          {/* Audio mode - show album art and lyrics */}
           {(!isVideoMode || !isVideo) && (
-            <div className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 rounded-xl shadow-2xl overflow-hidden">
-              {currentTrack.thumbnail ? (
-                <img
-                  src={currentTrack.thumbnail}
-                  alt={currentTrack.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <ThumbnailFallback
-                  title={currentTrack.title}
-                  id={currentTrack.id}
-                  isVideo={isVideo}
-                  size="large"
-                />
+            <div className={cn(
+              "flex items-center justify-center gap-8 w-full max-w-5xl px-4",
+              showLyrics ? "flex-row" : "flex-col"
+            )}>
+              {/* Album Art - hidden when lyrics are shown */}
+              {!showLyrics && (
+                <div className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 rounded-xl shadow-2xl overflow-hidden flex-shrink-0">
+                  {currentTrack.thumbnail ? (
+                    <img
+                      src={currentTrack.thumbnail}
+                      alt={currentTrack.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ThumbnailFallback
+                      title={currentTrack.title}
+                      id={currentTrack.id}
+                      isVideo={isVideo}
+                      size="large"
+                    />
+                  )}
+                </div>
               )}
+
+              {/* Lyrics Panel - full width when shown */}
+              <AnimatePresence>
+                {showLyrics && currentTrack && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="w-full max-w-3xl h-[50vh] md:h-[60vh]"
+                  >
+                    <LyricsDisplay
+                      mediaId={currentTrack.id}
+                      currentTime={currentTime}
+                      isPlaying={isPlaying}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -644,6 +673,30 @@ function MiniPlayer() {
                         </TooltipTrigger>
                         <TooltipContent>
                           {isVideoMode ? 'Switch to Audio Mode' : 'Switch to Video Mode'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+
+                  {/* Lyrics toggle button (for audio mode) */}
+                  {(!isVideoMode || !isVideo) && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setShowLyrics(!showLyrics)}
+                            className={cn(
+                              showLyrics && 'text-primary',
+                              isVideoMode && isVideo && 'text-white hover:bg-white/20'
+                            )}
+                          >
+                            <Subtitles className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {showLyrics ? 'Hide Lyrics' : 'Show Lyrics'}
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

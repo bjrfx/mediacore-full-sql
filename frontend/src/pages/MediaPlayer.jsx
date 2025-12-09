@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart,
   Share2,
@@ -20,6 +20,7 @@ import {
   VolumeX,
   ChevronDown,
   Music,
+  Subtitles,
 } from 'lucide-react';
 import { publicApi } from '../services/api';
 import { usePlayerStore, useLibraryStore, useAuthStore } from '../store';
@@ -34,11 +35,13 @@ import {
   DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu';
 import { cn, formatDuration, formatDate } from '../lib/utils';
+import { LyricsDisplay } from '../components/player';
 
 export default function MediaPlayer() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const [showLyrics, setShowLyrics] = useState(true);
   const {
     currentTrack,
     isPlaying,
@@ -68,6 +71,19 @@ export default function MediaPlayer() {
   });
 
   const media = data?.data;
+
+  // Debug: log media type
+  useEffect(() => {
+    if (media) {
+      console.log('[MediaPlayer] Media loaded:', { 
+        id: media.id, 
+        title: media.title,
+        mediaType: media.mediaType,
+        type: media.type,
+        showLyrics 
+      });
+    }
+  }, [media, showLyrics]);
 
   // Play media when loaded
   useEffect(() => {
@@ -136,7 +152,17 @@ export default function MediaPlayer() {
         <p className="text-sm text-white/70 truncate max-w-[200px]">
           Now Playing
         </p>
-        <DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("text-white", showLyrics && "text-primary")}
+            onClick={() => setShowLyrics(!showLyrics)}
+            title="Toggle Lyrics"
+          >
+            <Subtitles className="h-5 w-5" />
+          </Button>
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="text-white">
               <MoreHorizontal className="h-5 w-5" />
@@ -166,13 +192,14 @@ export default function MediaPlayer() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8 py-4">
+      <div className="flex-1 flex flex-col items-center justify-center px-8 py-4 overflow-hidden">
         {isLoading ? (
           <Skeleton className="w-72 h-72 rounded-lg" />
-        ) : media?.mediaType === 'video' ? (
+        ) : (media?.mediaType === 'video' || media?.type === 'video') ? (
           // Video player
           <div className="relative w-full max-w-4xl aspect-video bg-black rounded-lg overflow-hidden">
             <video
@@ -183,28 +210,56 @@ export default function MediaPlayer() {
             />
           </div>
         ) : (
-          // Audio artwork
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 200 }}
-            className="relative"
-          >
-            {media?.thumbnailUrl ? (
-              <img
-                src={media.thumbnailUrl}
-                alt={media.title}
-                className={cn(
-                  'w-72 h-72 rounded-lg shadow-2xl object-cover',
-                  isPlaying && 'animate-pulse'
-                )}
-              />
-            ) : (
-              <div className="w-72 h-72 rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center shadow-2xl">
-                <Music className="h-24 w-24 text-primary/50" />
-              </div>
-            )}
-          </motion.div>
+          // Audio artwork with lyrics
+          <div className={cn(
+            "flex items-start justify-center gap-8 w-full max-w-4xl",
+            showLyrics ? "flex-row" : "flex-col items-center"
+          )}>
+            {/* Artwork */}
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200 }}
+              className={cn("relative flex-shrink-0", showLyrics && "w-48 md:w-64")}
+            >
+              {media?.thumbnailUrl ? (
+                <img
+                  src={media.thumbnailUrl}
+                  alt={media.title}
+                  className={cn(
+                    'rounded-lg shadow-2xl object-cover',
+                    showLyrics ? 'w-48 h-48 md:w-64 md:h-64' : 'w-72 h-72',
+                    isPlaying && 'animate-pulse'
+                  )}
+                />
+              ) : (
+                <div className={cn(
+                  "rounded-lg bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center shadow-2xl",
+                  showLyrics ? 'w-48 h-48 md:w-64 md:h-64' : 'w-72 h-72'
+                )}>
+                  <Music className="h-24 w-24 text-primary/50" />
+                </div>
+              )}
+            </motion.div>
+
+            {/* Lyrics Panel */}
+            <AnimatePresence>
+              {showLyrics && media && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="flex-1 h-64 md:h-80 min-w-0"
+                >
+                  <LyricsDisplay
+                    mediaId={media.id}
+                    currentTime={progress}
+                    isPlaying={isPlaying}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         )}
 
         {/* Media info */}

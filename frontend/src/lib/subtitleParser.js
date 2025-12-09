@@ -271,35 +271,40 @@ export function parseSubtitles(content, format = null) {
 
 /**
  * Find the current active cue based on playback time
+ * Returns the cue that should be highlighted (either currently playing or most recently played)
  */
 export function findActiveCue(cues, currentTime) {
   if (!cues || cues.length === 0 || currentTime === null || currentTime === undefined) {
     return null;
   }
   
-  // For timed cues, find the one that matches current time
+  let lastPassedIndex = -1;
+  
+  // Find the cue that is currently active OR the last one we passed
   for (let i = 0; i < cues.length; i++) {
     const cue = cues[i];
-    if (cue.startTime !== null && cue.endTime !== null) {
-      if (currentTime >= cue.startTime && currentTime <= cue.endTime) {
-        return { cue, index: i };
-      }
+    
+    if (cue.startTime === null) continue;
+    
+    // If we're within this cue's time range, it's active
+    if (cue.endTime !== null && currentTime >= cue.startTime && currentTime <= cue.endTime) {
+      return { cue, index: i };
+    }
+    
+    // If we've passed this cue's start time, remember it
+    if (currentTime >= cue.startTime) {
+      lastPassedIndex = i;
+    }
+    
+    // If the current cue starts after current time, we've gone too far
+    if (currentTime < cue.startTime) {
+      break;
     }
   }
   
-  // If no exact match, find the closest upcoming cue
-  for (let i = 0; i < cues.length; i++) {
-    const cue = cues[i];
-    if (cue.startTime !== null && currentTime < cue.startTime) {
-      // Return previous cue if exists, otherwise null
-      return i > 0 ? { cue: cues[i - 1], index: i - 1 } : null;
-    }
-  }
-  
-  // If past all cues, return the last one
-  const lastCue = cues[cues.length - 1];
-  if (lastCue.endTime !== null && currentTime > lastCue.endTime) {
-    return { cue: lastCue, index: cues.length - 1 };
+  // Return the last cue we passed (most recent lyric)
+  if (lastPassedIndex >= 0) {
+    return { cue: cues[lastPassedIndex], index: lastPassedIndex };
   }
   
   return null;

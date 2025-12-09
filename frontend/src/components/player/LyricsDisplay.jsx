@@ -30,12 +30,15 @@ export default function LyricsDisplay({
   onSeek,
   isExpanded = true,
   className,
+  isPlaying = false,
 }) {
   const [selectedSubtitleId, setSelectedSubtitleId] = useState(null);
   const [parsedLyrics, setParsedLyrics] = useState({ cues: [], format: 'unknown', hasTimestamps: false });
   const [isLoading, setIsLoading] = useState(false);
   const lyricsContainerRef = useRef(null);
-  const activeCueRef = useRef(null);
+  const lyricRefs = useRef({});
+  const prevIndexRef = useRef(-1);
+  const prevTimeRef = useRef(0);
 
   // Fetch available subtitles for this media
   const { data: subtitlesData, isLoading: isLoadingSubtitles } = useQuery({
@@ -95,15 +98,48 @@ export default function LyricsDisplay({
     };
   }, [parsedLyrics, currentTime]);
 
-  // Scroll to active cue
+  // Scroll to active cue - triggers on every currentIndex or currentTime change
   useEffect(() => {
-    if (activeCueRef.current && lyricsContainerRef.current && parsedLyrics.hasTimestamps) {
-      activeCueRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
+    if (currentIndex < 0 || !parsedLyrics.hasTimestamps) return;
+    
+    const container = lyricsContainerRef.current;
+    const element = lyricRefs.current[currentIndex];
+    
+    if (!container || !element) return;
+    
+    // Detect if user is scrubbing (time jumped more than 2 seconds)
+    const timeDiff = Math.abs(currentTime - prevTimeRef.current);
+    const isScrubbing = timeDiff > 2;
+    const indexChanged = currentIndex !== prevIndexRef.current;
+    
+    // Scroll when index changes OR when scrubbing
+    if (indexChanged || isScrubbing) {
+      // Calculate scroll position to center the active element
+      const containerHeight = container.clientHeight;
+      const elementTop = element.offsetTop;
+      const elementHeight = element.offsetHeight;
+      
+      // Target position: center the element in the container
+      const targetScrollTop = elementTop - (containerHeight / 2) + (elementHeight / 2);
+      
+      // Use instant scroll for scrubbing, smooth for normal playback
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: isScrubbing ? 'auto' : 'smooth'
       });
+      
+      prevIndexRef.current = currentIndex;
     }
-  }, [currentIndex, parsedLyrics.hasTimestamps]);
+    
+    prevTimeRef.current = currentTime;
+  }, [currentIndex, currentTime, parsedLyrics.hasTimestamps]);
+
+  // Reset refs when media changes
+  useEffect(() => {
+    prevIndexRef.current = -1;
+    prevTimeRef.current = 0;
+    lyricRefs.current = {};
+  }, [mediaId]);
 
   // Handle clicking on a lyric line to seek
   const handleLyricClick = (cue) => {
@@ -181,7 +217,7 @@ export default function LyricsDisplay({
           </div>
         ) : parsedLyrics.hasTimestamps ? (
           // Synced lyrics (SRT/VTT)
-          <div className="space-y-4 py-[40vh]">
+          <div className="space-y-4 pt-[30%] pb-[50%]">
             {parsedLyrics.cues.map((cue, index) => {
               const isActive = index === currentIndex;
               const isPast = currentIndex > -1 && index < currentIndex;
@@ -190,7 +226,9 @@ export default function LyricsDisplay({
               return (
                 <motion.div
                   key={cue.id}
-                  ref={isActive ? activeCueRef : null}
+                  ref={(el) => {
+                    if (el) lyricRefs.current[index] = el;
+                  }}
                   initial={{ opacity: 0.5, scale: 0.95 }}
                   animate={{
                     opacity: isActive ? 1 : isPast ? 0.4 : 0.6,
@@ -198,7 +236,7 @@ export default function LyricsDisplay({
                   }}
                   transition={{ duration: 0.3 }}
                   className={cn(
-                    'cursor-pointer transition-all duration-300 py-2 px-3 rounded-lg',
+                    'cursor-pointer transition-all duration-300 py-2 px-3 rounded-lg text-center',
                     isActive
                       ? 'text-primary font-semibold text-2xl md:text-3xl'
                       : isPast
