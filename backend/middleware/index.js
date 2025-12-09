@@ -8,11 +8,15 @@ const checkAuth = require('./checkAuth');
 const checkApiKeyPermissions = require('./checkApiKeyPermissions');
 const analyticsTracker = require('./analyticsTracker');
 const requestLogger = require('./requestLogger');
+const { streamMedia, mediaStreamMiddleware, createStreamingRoutes } = require('./mediaStreamer');
 
 module.exports = {
   checkAdminAuth,
   checkAuth,
   checkApiKeyPermissions,
   analyticsTracker,
-  requestLogger
+  requestLogger,
+  streamMedia,
+  mediaStreamMiddleware,
+  createStreamingRoutes
 };

@@ -5,16 +5,54 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const compression = require('compression');
 const db = require('./config/db');
+const { createStreamingRoutes } = require('./middleware/mediaStreamer');
 
 const app = express();
 
 // Middleware
-app.use(cors({ origin: '*' }));
+app.use(cors({ 
+  origin: '*',
+  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length']
+}));
+
+// Compression for API responses (skip media files - they're already compressed)
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress media streams
+    if (req.path.startsWith('/uploads/audio') || 
+        req.path.startsWith('/uploads/video') ||
+        req.path.startsWith('/stream/')) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Balanced compression level
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/public', express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+
+// Static files with caching headers
+app.use('/public', express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  etag: true
+}));
+
+// Media streaming with Range request support (must be before static)
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+createStreamingRoutes(app, uploadsDir);
+
+// Static uploads fallback (for thumbnails and other files)
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
+  maxAge: '1d',
+  etag: true,
+  setHeaders: (res, filePath) => {
+    // Add Accept-Ranges for all files
+    res.set('Accept-Ranges', 'bytes');
+  }
+}));
 
 // Request logger - logs to MySQL for analytics
 const requestLogger = require('./middleware/requestLogger');
