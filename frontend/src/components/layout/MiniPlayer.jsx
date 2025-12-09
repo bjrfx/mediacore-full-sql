@@ -511,7 +511,7 @@ function MiniPlayer() {
           {/* ReactPlayer */}
           <ReactPlayer
             ref={playerRef}
-            url={currentTrack.fileUrl}
+            url={currentTrack.streamUrl || currentTrack.fileUrl}
             playing={isPlaying}
             volume={isMuted ? 0 : volume}
             playbackRate={playbackSpeed}
@@ -536,6 +536,9 @@ function MiniPlayer() {
               file: {
                 attributes: {
                   style: { width: '100%', height: '100%', objectFit: 'contain' },
+                  preload: 'metadata',
+                  playsInline: true,
+                  crossOrigin: 'anonymous',
                 },
               },
             }}
@@ -1071,7 +1074,7 @@ function MiniPlayer() {
       <div className="fixed" style={{ top: -9999, left: -9999 }}>
         <ReactPlayer
           ref={playerRef}
-          url={currentTrack.fileUrl}
+          url={currentTrack.streamUrl || currentTrack.fileUrl}
           playing={isPlaying}
           volume={isMuted ? 0 : volume}
           playbackRate={playbackSpeed}
@@ -1086,6 +1089,15 @@ function MiniPlayer() {
           height="0"
           progressInterval={500}
           style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}
+          config={{
+            file: {
+              attributes: {
+                preload: 'metadata',
+                playsInline: true,
+                crossOrigin: 'anonymous',
+              },
+            },
+          }}
         />
       </div>
 

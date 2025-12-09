@@ -17,9 +17,8 @@ console.log('[API] Base URL:', API_BASE_URL);
  */
 const normalizeMediaItem = (item) => {
   if (!item) return item;
-  return {
+  const normalized = {
     ...item,
-    // Convert snake_case to camelCase
     fileUrl: item.fileUrl ?? item.file_path ?? item.filePath ?? '',
     filePath: item.filePath ?? item.file_path ?? '',
     fileSize: item.fileSize ?? item.file_size ?? 0,
@@ -31,6 +30,24 @@ const normalizeMediaItem = (item) => {
     updatedAt: item.updatedAt ?? item.updated_at,
     uploadedAt: item.uploadedAt ?? item.uploaded_at,
   };
+
+  try {
+    const src = normalized.fileUrl || '';
+    const isAbsolute = src.startsWith('http://') || src.startsWith('https://');
+    const u = isAbsolute ? new URL(src) : new URL(src || '/', API_BASE_URL);
+    const pathname = u.pathname || '';
+    const filename = pathname.split('/').pop() || '';
+    const inferredType = normalized.type || (pathname.includes('/audio/') ? 'audio' : (pathname.includes('/video/') ? 'video' : ''));
+    if (filename && inferredType) {
+      normalized.streamUrl = `${API_BASE_URL}/stream/${inferredType}/${filename}`;
+    } else {
+      normalized.streamUrl = isAbsolute ? u.toString() : `${API_BASE_URL}${pathname}`;
+    }
+  } catch (e) {
+    normalized.streamUrl = normalized.fileUrl || '';
+  }
+
+  return normalized;
 };
 
 /**

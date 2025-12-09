@@ -118,6 +118,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip caching for media streaming endpoints
+  if (event.request.url.includes('/uploads/audio') ||
+      event.request.url.includes('/uploads/video') ||
+      event.request.url.includes('/stream/')) {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+
   // Default: network first
   event.respondWith(
     fetch(event.request)

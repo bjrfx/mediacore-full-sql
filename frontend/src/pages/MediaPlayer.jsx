@@ -207,6 +207,9 @@ export default function MediaPlayer() {
               poster={media.thumbnailUrl}
               className="w-full h-full"
               controls={false}
+              playsInline
+              preload="metadata"
+              crossOrigin="anonymous"
             />
           </div>
         ) : (
