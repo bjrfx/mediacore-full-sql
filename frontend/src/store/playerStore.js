@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// Helper to normalize track data (ensure thumbnail property exists)
+const normalizeTrack = (track) => {
+  if (!track) return track;
+  return {
+    ...track,
+    // Ensure thumbnail is set from various possible sources
+    thumbnail: track.thumbnail || track.thumbnailUrl || track.thumbnail_url || track.thumbnail_path || '',
+    thumbnailUrl: track.thumbnailUrl || track.thumbnail_url || track.thumbnail || track.thumbnail_path || '',
+  };
+};
+
 // Helper to check subscription (imported dynamically to avoid circular dependency)
 const checkSubscription = async () => {
   try {
@@ -74,12 +85,15 @@ const usePlayerStore = create(
           get().saveProgress(currentTrack.id, currentTime, duration);
         }
 
+        // Normalize track to ensure thumbnail is available
+        const normalizedTrack = normalizeTrack(track);
+
         // Get saved progress for new track
-        const savedProgress = track ? get().playbackProgress[track.id] : null;
+        const savedProgress = normalizedTrack ? get().playbackProgress[normalizedTrack.id] : null;
         const resumeTime = savedProgress?.currentTime || 0;
 
         set({
-          currentTrack: track,
+          currentTrack: normalizedTrack,
           isMiniPlayerVisible: !!track,
           isLoading: true,
           currentTime: resumeTime,
@@ -94,11 +108,12 @@ const usePlayerStore = create(
       },
 
       setQueue: (queue, startIndex = 0) => {
+        const normalizedQueue = queue.map(normalizeTrack);
         set({
-          queue,
+          queue: normalizedQueue,
           queueIndex: startIndex,
-          currentTrack: queue[startIndex] || null,
-          isMiniPlayerVisible: queue.length > 0,
+          currentTrack: normalizedQueue[startIndex] || null,
+          isMiniPlayerVisible: normalizedQueue.length > 0,
         });
       },
 
@@ -129,19 +144,22 @@ const usePlayerStore = create(
           get().saveProgress(currentTrack.id, currentTime, duration);
         }
 
+        // Normalize track to ensure thumbnail is available
+        const normalizedTrack = normalizeTrack(track);
+
         // Get saved progress for new track
-        const savedProgress = resumeFromSaved ? get().playbackProgress[track.id] : null;
+        const savedProgress = resumeFromSaved ? get().playbackProgress[normalizedTrack.id] : null;
         const resumeTime = savedProgress?.currentTime || 0;
 
         // Check for downloaded version (imported dynamically to avoid circular dependency)
-        let trackToPlay = track;
+        let trackToPlay = normalizedTrack;
         try {
           const downloadStore = (await import('./downloadStore')).default;
           const downloadState = downloadStore.getState();
-          if (downloadState.isDownloaded(track.id)) {
-            const downloadedUrl = await downloadState.getDownloadedUrl(track.id);
+          if (downloadState.isDownloaded(normalizedTrack.id)) {
+            const downloadedUrl = await downloadState.getDownloadedUrl(normalizedTrack.id);
             if (downloadedUrl) {
-              trackToPlay = { ...track, fileUrl: downloadedUrl, isOffline: true };
+              trackToPlay = { ...normalizedTrack, fileUrl: downloadedUrl, isOffline: true };
             }
           }
         } catch (error) {
@@ -149,9 +167,10 @@ const usePlayerStore = create(
         }
 
         if (queue) {
-          const index = queue.findIndex((t) => t.id === track.id);
+          const normalizedQueue = queue.map(normalizeTrack);
+          const index = normalizedQueue.findIndex((t) => t.id === normalizedTrack.id);
           set({
-            queue,
+            queue: normalizedQueue,
             queueIndex: index >= 0 ? index : 0,
             currentTrack: trackToPlay,
             isPlaying: true,
@@ -168,8 +187,8 @@ const usePlayerStore = create(
             seekToTime: resumeTime > 0 ? resumeTime : null, // Signal player to seek
           });
         }
-        if (track) {
-          get().addToHistory(track);
+        if (normalizedTrack) {
+          get().addToHistory(normalizedTrack);
         }
       },
 
@@ -210,10 +229,11 @@ const usePlayerStore = create(
         const progressIds = Object.keys(playbackProgress);
         
         // Match progress with history items to get full media info
+        // Normalize items to ensure thumbnail is available (for items saved before thumbnail support)
         return history
           .filter((item) => progressIds.includes(item.id))
           .map((item) => ({
-            ...item,
+            ...normalizeTrack(item),
             progress: playbackProgress[item.id],
           }))
           .sort((a, b) => new Date(b.progress.updatedAt) - new Date(a.progress.updatedAt))
@@ -287,7 +307,7 @@ const usePlayerStore = create(
           }
         }
 
-        const nextTrack = queue[nextIndex];
+        const nextTrack = normalizeTrack(queue[nextIndex]);
         if (nextTrack) {
           // Start tracking new track for stats
           if (statsStore) {
@@ -325,7 +345,7 @@ const usePlayerStore = create(
         }
 
         const prevIndex = queueIndex > 0 ? queueIndex - 1 : queue.length - 1;
-        const prevTrack = queue[prevIndex];
+        const prevTrack = normalizeTrack(queue[prevIndex]);
         if (prevTrack) {
           const savedProgress = get().playbackProgress[prevTrack.id];
           set({
