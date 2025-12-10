@@ -519,7 +519,7 @@ export default function AdminArtistDetail() {
                 <div className="flex items-center gap-2 mt-2">
                   {artist.genre && <Badge variant="secondary">{artist.genre}</Badge>}
                   <span className="text-muted-foreground">
-                    {artistAlbums.length} albums • {artistMedia.length} tracks
+                    {artistAlbums.length} albums • {artist.trackCount || artistMedia.length} tracks
                   </span>
                 </div>
               </div>

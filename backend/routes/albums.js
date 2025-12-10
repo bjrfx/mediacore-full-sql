@@ -357,4 +357,173 @@ router.get('/admin/albums/:artistId/for-artist', checkAdminAuth, async (req, res
   }
 });
 
+// =============================================================================
+// ADMIN ROUTES - ALBUM-MEDIA RELATIONSHIPS
+// =============================================================================
+
+/**
+ * POST /admin/albums/:id/media
+ * Add media to an album (Admin only)
+ */
+router.post('/admin/albums/:id/media', checkAdminAuth, async (req, res) => {
+  try {
+    const { id: albumId } = req.params;
+    const { mediaId, trackNumber } = req.body;
+    
+    if (!mediaId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'mediaId is required'
+      });
+    }
+    
+    // Verify album exists
+    const album = await db.queryOne('SELECT * FROM albums WHERE id = ?', [albumId]);
+    if (!album) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Album not found'
+      });
+    }
+    
+    // Verify media exists
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
+    if (!media) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media not found'
+      });
+    }
+    
+    // Update the media to assign it to this album
+    await db.query(
+      `UPDATE media SET album_id = ?, track_number = ?, updated_at = NOW() WHERE id = ?`,
+      [albumId, trackNumber || null, mediaId]
+    );
+    
+    // Fetch updated media
+    const updatedMedia = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
+    
+    console.log(`✅ Added media ${mediaId} to album ${albumId} as track ${trackNumber}`);
+    
+    res.json({
+      success: true,
+      message: 'Media added to album successfully',
+      data: updatedMedia
+    });
+  } catch (error) {
+    console.error('Error adding media to album:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to add media to album'
+    });
+  }
+});
+
+/**
+ * DELETE /admin/albums/:id/media/:mediaId
+ * Remove media from an album (Admin only)
+ */
+router.delete('/admin/albums/:id/media/:mediaId', checkAdminAuth, async (req, res) => {
+  try {
+    const { id: albumId, mediaId } = req.params;
+    
+    // Verify album exists
+    const album = await db.queryOne('SELECT * FROM albums WHERE id = ?', [albumId]);
+    if (!album) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Album not found'
+      });
+    }
+    
+    // Verify media exists and is in this album
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ? AND album_id = ?', [mediaId, albumId]);
+    if (!media) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media not found in this album'
+      });
+    }
+    
+    // Remove the media from the album (set album_id to NULL)
+    await db.query(
+      `UPDATE media SET album_id = NULL, track_number = NULL, updated_at = NOW() WHERE id = ?`,
+      [mediaId]
+    );
+    
+    console.log(`✅ Removed media ${mediaId} from album ${albumId}`);
+    
+    res.json({
+      success: true,
+      message: 'Media removed from album successfully'
+    });
+  } catch (error) {
+    console.error('Error removing media from album:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to remove media from album'
+    });
+  }
+});
+
+/**
+ * PUT /admin/albums/:id/media/reorder
+ * Reorder tracks in an album (Admin only)
+ */
+router.put('/admin/albums/:id/media/reorder', checkAdminAuth, async (req, res) => {
+  try {
+    const { id: albumId } = req.params;
+    const { tracks } = req.body;
+    
+    if (!tracks || !Array.isArray(tracks)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'tracks array is required'
+      });
+    }
+    
+    // Verify album exists
+    const album = await db.queryOne('SELECT * FROM albums WHERE id = ?', [albumId]);
+    if (!album) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Album not found'
+      });
+    }
+    
+    // Update track numbers for each media item
+    for (const track of tracks) {
+      const { mediaId, trackNumber } = track;
+      await db.query(
+        `UPDATE media SET track_number = ?, updated_at = NOW() WHERE id = ? AND album_id = ?`,
+        [trackNumber, mediaId, albumId]
+      );
+    }
+    
+    console.log(`✅ Reordered ${tracks.length} tracks in album ${albumId}`);
+    
+    res.json({
+      success: true,
+      message: 'Tracks reordered successfully'
+    });
+  } catch (error) {
+    console.error('Error reordering tracks:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to reorder tracks'
+    });
+  }
+});
+
 module.exports = router;
