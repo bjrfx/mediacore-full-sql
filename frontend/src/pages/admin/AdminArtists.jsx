@@ -184,11 +184,11 @@ export default function AdminArtists() {
     deleteMutation.mutate({ id: selectedArtist.id, cascade: true });
   };
 
-  const getArtistStats = (artistId) => {
-    const artistAlbums = albums.filter((album) => album.artistId === artistId);
+  // Get artist stats - use the values from the API response which correctly count all media for the artist
+  const getArtistStats = (artist) => {
     return {
-      albumCount: artistAlbums.length,
-      trackCount: artistAlbums.reduce((acc, album) => acc + (album.trackCount || 0), 0),
+      albumCount: artist.albumCount || 0,
+      trackCount: artist.trackCount || 0,
     };
   };
 
@@ -260,7 +260,7 @@ export default function AdminArtists() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredArtists.map((artist) => {
-            const stats = getArtistStats(artist.id);
+            const stats = getArtistStats(artist);
             return (
               <Card key={artist.id} className="group overflow-hidden hover:border-primary/50 transition-colors">
                 <CardContent className="p-0">

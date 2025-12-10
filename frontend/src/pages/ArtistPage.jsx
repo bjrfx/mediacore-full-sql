@@ -56,21 +56,15 @@ export default function ArtistPage() {
   const artist = artistData?.data;
   const artistAlbums = useMemo(() => albumsData?.data || [], [albumsData?.data]);
 
-  // Fetch media for each album and combine them
-  const { data: allAlbumMedia, isLoading: mediaLoading } = useQuery({
-    queryKey: ["artist", artistId, "allAlbumMedia", artistAlbums.map(a => a.id).join(",")],
-    queryFn: async () => {
-      const mediaPromises = artistAlbums.map(album =>
-        publicApi.getAlbumMedia(album.id).then(res => res?.data || [])
-      );
-      const allMedia = await Promise.all(mediaPromises);
-      return allMedia.flat();
-    },
-    enabled: artistAlbums.length > 0,
+  // Fetch all media for the artist (includes both album tracks and singles)
+  const { data: artistMediaData, isLoading: mediaLoading } = useQuery({
+    queryKey: ['artist', artistId, 'media'],
+    queryFn: () => publicApi.getArtistMedia(artistId),
+    enabled: !!artistId,
   });
 
   const artistMedia = useMemo(() => {
-    const tracks = allAlbumMedia || [];
+    const tracks = artistMediaData?.data || [];
     return tracks.map(track => {
       const trackAlbum = artistAlbums.find(a => a.id === track.albumId);
       return {
@@ -81,7 +75,7 @@ export default function ArtistPage() {
         albumCover: trackAlbum?.coverImage || "",
       };
     });
-  }, [allAlbumMedia, artist, artistAlbums]);
+  }, [artistMediaData?.data, artist, artistAlbums]);
 
   // Calculate stats
   const stats = useMemo(() => {

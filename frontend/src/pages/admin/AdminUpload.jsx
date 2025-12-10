@@ -352,6 +352,13 @@ export default function AdminUpload() {
     onSuccess: async (data) => {
       queryClient.invalidateQueries(['media']);
       queryClient.invalidateQueries(['admin-media']);
+      // Invalidate artist-related queries to update track counts
+      queryClient.invalidateQueries(['artists']);
+      if (hlsSelectedArtistId) {
+        queryClient.invalidateQueries(['artist', hlsSelectedArtistId]);
+        queryClient.invalidateQueries(['artist-media', hlsSelectedArtistId]);
+        queryClient.invalidateQueries(['artist-albums', hlsSelectedArtistId]);
+      }
       
       const mediaId = data?.data?.id;
       

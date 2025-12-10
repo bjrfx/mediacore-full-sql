@@ -134,10 +134,8 @@ function ArtistCard({ artist, index }) {
   const albums = albumsData?.data || [];
   const albumCount = albums.length;
 
-  // Calculate total track count from album trackCounts
-  const trackCount = useMemo(() => {
-    return albums.reduce((total, album) => total + (album.trackCount || 0), 0);
-  }, [albums]);
+  // Use trackCount from artist API response (counts all media for artist, not just album tracks)
+  const trackCount = artist.trackCount || 0;
 
   return (
     <motion.div
