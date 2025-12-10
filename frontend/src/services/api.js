@@ -30,6 +30,9 @@ const normalizeMediaItem = (item) => {
     createdAt: item.createdAt ?? item.created_at,
     updatedAt: item.updatedAt ?? item.updated_at,
     uploadedAt: item.uploadedAt ?? item.uploaded_at,
+    // HLS support
+    isHls: item.isHls ?? item.is_hls ?? false,
+    hlsPlaylistUrl: item.hlsPlaylistUrl ?? item.hls_playlist_url ?? null,
   };
 };
 
@@ -332,6 +335,67 @@ export const adminApi = {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data',
       },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      },
+    });
+    return response.data;
+  },
+
+  // Upload HLS media bundle (ZIP file containing .m3u8 and .ts files)
+  uploadHLSMedia: async (hlsBundle, title, options = {}) => {
+    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, onProgress } = options;
+    const token = localStorage.getItem('accessToken');
+    
+    const formData = new FormData();
+    formData.append('hlsBundle', hlsBundle);
+    formData.append('title', title);
+    formData.append('subtitle', subtitle);
+    formData.append('language', language);
+    if (artistId) formData.append('artistId', artistId);
+    if (albumId) formData.append('albumId', albumId);
+    if (contentGroupId) formData.append('contentGroupId', contentGroupId);
+    if (duration) formData.append('duration', duration.toString());
+
+    console.log('[API] HLS Upload:', { fileName: hlsBundle.name, fileSize: hlsBundle.size, title, language });
+
+    const response = await api.post('/admin/media/hls', formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 600000, // 10 minute timeout for large HLS bundles
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      },
+    });
+    return response.data;
+  },
+
+  // Upload additional HLS segments to existing media
+  uploadHLSSegments: async (mediaId, segmentFiles, onProgress) => {
+    const token = localStorage.getItem('accessToken');
+    
+    const formData = new FormData();
+    formData.append('mediaId', mediaId);
+    segmentFiles.forEach(file => {
+      formData.append('segments', file);
+    });
+
+    console.log('[API] HLS Segments Upload:', { mediaId, fileCount: segmentFiles.length });
+
+    const response = await api.post('/admin/media/hls/segments', formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 600000,
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);

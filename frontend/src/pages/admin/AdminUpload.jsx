@@ -24,6 +24,8 @@ import {
   PlusCircle,
   FileText,
   Subtitles,
+  FolderArchive,
+  PlayCircle,
 } from 'lucide-react';
 import { publicApi, adminApi } from '../../services/api';
 import { useUIStore } from '../../store';
@@ -85,8 +87,8 @@ export default function AdminUpload() {
   const queryClient = useQueryClient();
   const { addToast } = useUIStore();
   
-  // Tab state for switching between single and multi-language upload
-  const [uploadMode, setUploadMode] = useState('single'); // 'single' or 'multi'
+  // Tab state for switching between single, multi-language, and HLS upload
+  const [uploadMode, setUploadMode] = useState('single'); // 'single', 'multi', or 'hls'
   
   // Single upload state
   const [file, setFile] = useState(null);
@@ -96,6 +98,16 @@ export default function AdminUpload() {
   const [language, setLanguage] = useState('en');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  
+  // HLS upload state
+  const [hlsFile, setHlsFile] = useState(null);
+  const [hlsTitle, setHlsTitle] = useState('');
+  const [hlsSubtitle, setHlsSubtitle] = useState('');
+  const [hlsLanguage, setHlsLanguage] = useState('en');
+  const [hlsDuration, setHlsDuration] = useState('');
+  const [hlsUploadProgress, setHlsUploadProgress] = useState(0);
+  const [hlsSelectedArtistId, setHlsSelectedArtistId] = useState('');
+  const [hlsSelectedAlbumId, setHlsSelectedAlbumId] = useState('');
   
   // Multi-language upload state
   const [multiFiles, setMultiFiles] = useState([]); // [{file, language, progress, status}]
@@ -299,6 +311,53 @@ export default function AdminUpload() {
     setSelectedArtistId('');
     setSelectedAlbumId('');
   };
+
+  const resetHlsForm = () => {
+    setHlsFile(null);
+    setHlsTitle('');
+    setHlsSubtitle('');
+    setHlsLanguage('en');
+    setHlsDuration('');
+    setHlsUploadProgress(0);
+    setHlsSelectedArtistId('');
+    setHlsSelectedAlbumId('');
+  };
+
+  // HLS Upload mutation
+  const hlsUploadMutation = useMutation({
+    mutationFn: ({ hlsBundle, title, options }) =>
+      adminApi.uploadHLSMedia(hlsBundle, title, options),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['media']);
+      queryClient.invalidateQueries(['admin-media']);
+      
+      // Add to recent uploads
+      const langInfo = LANGUAGES.find(l => l.code === hlsLanguage) || { name: hlsLanguage };
+      setRecentUploads(prev => [{
+        id: data?.data?.id,
+        title: hlsTitle,
+        type: 'video',
+        language: hlsLanguage,
+        languageName: langInfo.name,
+        isHls: true,
+        hlsPlaylistUrl: data?.data?.hlsPlaylistUrl,
+        segmentCount: data?.data?.segmentCount,
+        uploadedAt: new Date().toISOString(),
+      }, ...prev].slice(0, 10));
+      
+      resetHlsForm();
+      addToast({ 
+        message: `HLS video uploaded successfully! (${data?.data?.segmentCount || 0} segments)`, 
+        type: 'success' 
+      });
+    },
+    onError: (error) => {
+      addToast({
+        message: error.response?.data?.message || 'HLS upload failed',
+        type: 'error',
+      });
+    },
+  });
   
   const handleCreateArtist = () => {
     if (!newArtistName.trim()) return;
@@ -561,21 +620,25 @@ export default function AdminUpload() {
             Upload Media
           </h2>
           <p className="text-muted-foreground">
-            Upload video or audio files with multi-language support
+            Upload video or audio files with multi-language and HLS streaming support
           </p>
         </div>
       </div>
 
       {/* Upload Mode Tabs */}
       <Tabs value={uploadMode} onValueChange={setUploadMode} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="single" className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
             Single Upload
           </TabsTrigger>
+          <TabsTrigger value="hls" className="flex items-center gap-2">
+            <PlayCircle className="h-4 w-4" />
+            HLS Video
+          </TabsTrigger>
           <TabsTrigger value="multi" className="flex items-center gap-2">
             <Languages className="h-4 w-4" />
-            Multi-Language Upload
+            Multi-Language
           </TabsTrigger>
         </TabsList>
 
@@ -1040,6 +1103,315 @@ export default function AdminUpload() {
           </form>
         </TabsContent>
 
+        {/* HLS Video Upload Tab */}
+        <TabsContent value="hls" className="space-y-6 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlayCircle className="h-5 w-5 text-primary" />
+                Upload HLS Streaming Video
+              </CardTitle>
+              <CardDescription>
+                Upload a ZIP file containing your HLS video bundle (.m3u8 playlist and .ts segment files).
+                The folder structure will be preserved for streaming.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* HLS Drop Zone */}
+              <div
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const droppedFile = e.dataTransfer?.files[0] || e.target?.files?.[0];
+                  if (droppedFile) {
+                    const ext = droppedFile.name.split('.').pop()?.toLowerCase();
+                    if (ext === 'zip' || ext === 'm3u8') {
+                      setHlsFile(droppedFile);
+                      if (!hlsTitle) {
+                        const name = droppedFile.name.replace(/\.(zip|m3u8)$/i, '');
+                        setHlsTitle(name);
+                      }
+                    } else {
+                      addToast({
+                        message: 'Please upload a ZIP file containing HLS content (.m3u8 and .ts files)',
+                        type: 'error',
+                      });
+                    }
+                  }
+                }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={cn(
+                  'border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer',
+                  isDragging
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50',
+                  hlsFile && 'border-green-500 bg-green-500/5'
+                )}
+              >
+                <input
+                  type="file"
+                  accept=".zip,.m3u8"
+                  onChange={(e) => {
+                    const selectedFile = e.target?.files?.[0];
+                    if (selectedFile) {
+                      setHlsFile(selectedFile);
+                      if (!hlsTitle) {
+                        const name = selectedFile.name.replace(/\.(zip|m3u8)$/i, '');
+                        setHlsTitle(name);
+                      }
+                    }
+                  }}
+                  className="hidden"
+                  id="hls-file-upload"
+                />
+                <label htmlFor="hls-file-upload" className="cursor-pointer">
+                  <AnimatePresence mode="wait">
+                    {hlsFile ? (
+                      <motion.div
+                        key="hls-file-selected"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="space-y-4"
+                      >
+                        <div className="inline-flex p-4 rounded-full bg-green-500/20">
+                          <FolderArchive className="h-8 w-8 text-green-500" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{hlsFile.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatFileSize(hlsFile.size)} • HLS Bundle
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setHlsFile(null);
+                          }}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Remove
+                        </Button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="hls-drop-zone"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="space-y-4"
+                      >
+                        <div className="inline-flex p-4 rounded-full bg-muted">
+                          <FolderArchive className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="font-medium">
+                            Drag and drop your HLS bundle here
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            or click to browse
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <FolderArchive className="h-4 w-4" />
+                            ZIP file containing .m3u8 + .ts files
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Maximum file size: 2GB
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </label>
+              </div>
+
+              {/* HLS Info Card */}
+              <Card className="bg-blue-500/5 border-blue-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-full bg-blue-500/10">
+                      <AlertCircle className="h-4 w-4 text-blue-500" />
+                    </div>
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-600 dark:text-blue-400">How to prepare HLS content</p>
+                      <ul className="mt-1 text-muted-foreground list-disc list-inside space-y-1">
+                        <li>Create a ZIP file containing your .m3u8 playlist file</li>
+                        <li>Include all .ts segment files in the same ZIP</li>
+                        <li>Ensure segment paths in .m3u8 are relative (not absolute)</li>
+                        <li>Use tools like FFmpeg to convert MP4 to HLS format</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </CardContent>
+          </Card>
+
+          {/* HLS Media Details */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Video Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hls-title">Title *</Label>
+                  <Input
+                    id="hls-title"
+                    placeholder="Enter video title"
+                    value={hlsTitle}
+                    onChange={(e) => setHlsTitle(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hls-language">Language</Label>
+                  <Select value={hlsLanguage} onValueChange={setHlsLanguage}>
+                    <SelectTrigger id="hls-language">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          <span className="flex items-center gap-2">
+                            <Globe className="h-4 w-4" />
+                            {lang.name} ({lang.nativeName})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hls-subtitle">Subtitle/Description</Label>
+                  <Input
+                    id="hls-subtitle"
+                    placeholder="Optional subtitle or description"
+                    value={hlsSubtitle}
+                    onChange={(e) => setHlsSubtitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hls-duration">Duration (seconds)</Label>
+                  <Input
+                    id="hls-duration"
+                    type="number"
+                    placeholder="Optional: video duration in seconds"
+                    value={hlsDuration}
+                    onChange={(e) => setHlsDuration(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Artist/Album Selection for HLS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hls-artist">Artist (Optional)</Label>
+                  <Select value={hlsSelectedArtistId} onValueChange={setHlsSelectedArtistId}>
+                    <SelectTrigger id="hls-artist">
+                      <SelectValue placeholder="Select artist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No Artist</SelectItem>
+                      {artists.map((artist) => (
+                        <SelectItem key={artist.id} value={artist.id}>
+                          <span className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            {artist.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hls-album">Album (Optional)</Label>
+                  <Select 
+                    value={hlsSelectedAlbumId} 
+                    onValueChange={setHlsSelectedAlbumId}
+                    disabled={!hlsSelectedArtistId}
+                  >
+                    <SelectTrigger id="hls-album">
+                      <SelectValue placeholder={hlsSelectedArtistId ? "Select album" : "Select artist first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No Album</SelectItem>
+                      {artistAlbums.map((album) => (
+                        <SelectItem key={album.id} value={album.id}>
+                          {album.title || album.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* HLS Upload Progress */}
+          {hlsUploadProgress > 0 && hlsUploadProgress < 100 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Uploading HLS bundle...</span>
+                    <span>{hlsUploadProgress}%</span>
+                  </div>
+                  <Progress value={hlsUploadProgress} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* HLS Upload Button */}
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              size="lg"
+              disabled={!hlsFile || !hlsTitle.trim() || hlsUploadMutation.isPending}
+              onClick={() => {
+                if (!hlsFile || !hlsTitle.trim()) {
+                  addToast({ message: 'Please select a file and enter a title', type: 'error' });
+                  return;
+                }
+                hlsUploadMutation.mutate({
+                  hlsBundle: hlsFile,
+                  title: hlsTitle.trim(),
+                  options: {
+                    subtitle: hlsSubtitle.trim(),
+                    language: hlsLanguage,
+                    artistId: hlsSelectedArtistId || null,
+                    albumId: hlsSelectedAlbumId || null,
+                    duration: hlsDuration ? parseInt(hlsDuration) : undefined,
+                    onProgress: setHlsUploadProgress,
+                  },
+                });
+              }}
+            >
+              {hlsUploadMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading HLS...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="h-4 w-4 mr-2" />
+                  Upload HLS Video
+                </>
+              )}
+            </Button>
+          </div>
+        </TabsContent>
+
         {/* Multi-Language Upload Tab */}
         <TabsContent value="multi" className="space-y-6 mt-6">
           {/* Drop zone for multiple files */}
@@ -1369,7 +1741,9 @@ export default function AdminUpload() {
                       className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
                     >
                       <div className="p-1.5 rounded bg-muted">
-                        {upload.type === 'video' ? (
+                        {upload.isHls ? (
+                          <PlayCircle className="h-4 w-4 text-green-500" />
+                        ) : upload.type === 'video' ? (
                           <Film className="h-4 w-4 text-muted-foreground" />
                         ) : (
                           <Music className="h-4 w-4 text-muted-foreground" />
@@ -1381,6 +1755,12 @@ export default function AdminUpload() {
                           {new Date(upload.uploadedAt).toLocaleTimeString()}
                         </p>
                       </div>
+                      {upload.isHls && (
+                        <Badge variant="default" className="flex items-center gap-1 bg-green-600">
+                          <PlayCircle className="h-3 w-3" />
+                          HLS {upload.segmentCount && `(${upload.segmentCount})`}
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className="flex items-center gap-1">
                         <Globe className="h-3 w-3" />
                         {upload.languageName}
@@ -1402,7 +1782,7 @@ export default function AdminUpload() {
 
       {/* Status messages */}
       <AnimatePresence>
-        {uploadMutation.isSuccess && (
+        {(uploadMutation.isSuccess || hlsUploadMutation.isSuccess) && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1414,7 +1794,7 @@ export default function AdminUpload() {
           </motion.div>
         )}
 
-        {uploadMutation.isError && (
+        {(uploadMutation.isError || hlsUploadMutation.isError) && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1423,7 +1803,9 @@ export default function AdminUpload() {
           >
             <AlertCircle className="h-5 w-5" />
             <span>
-              {uploadMutation.error?.response?.data?.message || 'Upload failed'}
+              {uploadMutation.error?.response?.data?.message || 
+               hlsUploadMutation.error?.response?.data?.message || 
+               'Upload failed'}
             </span>
           </motion.div>
         )}

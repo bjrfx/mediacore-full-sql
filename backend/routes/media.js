@@ -16,6 +16,8 @@ const multer = require('multer');
 const { mediaDAO } = require('../data/dao');
 const db = require('../config/db');
 const { checkAuth, checkAdminAuth, checkApiKeyPermissions } = require('../middleware');
+const archiver = require('archiver');
+const unzipper = require('unzipper');
 
 // =============================================================================
 // MULTER CONFIGURATION FOR FILE UPLOADS
@@ -24,9 +26,11 @@ const { checkAuth, checkAdminAuth, checkApiKeyPermissions } = require('../middle
 // Production-only configuration - single path for cPanel hosting
 const UPLOAD_BASE_PATH = '/home/masakali/mediacoreapi-sql.masakalirestrobar.ca/backend/public';
 const UPLOAD_DIR = path.join(UPLOAD_BASE_PATH, 'uploads');
+const HLS_UPLOAD_DIR = path.join(UPLOAD_DIR, 'hls');
 const PRODUCTION_URL = 'https://mediacoreapi-sql.masakalirestrobar.ca';
 
-const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB for regular uploads
+const MAX_HLS_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB for HLS bundles
 
 // Allowed file types
 const ALLOWED_MIME_TYPES = {
@@ -42,13 +46,19 @@ const ALLOWED_MIME_TYPES = {
   subtitle: [
     'text/plain', 'text/vtt', 'application/x-subrip',
     'text/srt', 'application/octet-stream'
+  ],
+  hls: [
+    'application/x-mpegURL', 'application/vnd.apple.mpegURL',
+    'video/MP2T', 'video/mp2t', 'application/octet-stream',
+    'application/zip', 'application/x-zip-compressed'
   ]
 };
 
 const ALLOWED_EXTENSIONS = {
   video: ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.mpeg', '.mpg'],
   audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'],
-  subtitle: ['.srt', '.vtt', '.txt']
+  subtitle: ['.srt', '.vtt', '.txt'],
+  hls: ['.m3u8', '.ts', '.zip']
 };
 
 // Ensure upload directory exists on server
@@ -56,6 +66,15 @@ const ensureUploadDir = () => {
   // In production (cPanel), directories should already exist
   // This function just returns the path
   return UPLOAD_DIR;
+};
+
+// Ensure HLS upload directory exists
+const ensureHLSUploadDir = (mediaId) => {
+  const hlsDir = path.join(HLS_UPLOAD_DIR, mediaId);
+  if (!fs.existsSync(hlsDir)) {
+    fs.mkdirSync(hlsDir, { recursive: true });
+  }
+  return hlsDir;
 };
 
 const uploadPath = ensureUploadDir();
@@ -145,6 +164,44 @@ const subtitleUpload = multer({
   storage: subtitleStorage,
   fileFilter: subtitleFilter,
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB max for subtitles
+});
+
+// HLS ZIP storage configuration (for uploading HLS bundles as ZIP)
+const hlsStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Store ZIP temporarily in uploads directory
+    const tempDir = path.join(uploadPath, 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    cb(null, tempDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `hls_${Date.now()}_${uniqueId}${ext}`);
+  }
+});
+
+// HLS file filter
+const hlsFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mimeType = file.mimetype.toLowerCase();
+  
+  const isValidHLS = ALLOWED_EXTENSIONS.hls.includes(ext) || 
+                     ALLOWED_MIME_TYPES.hls.includes(mimeType);
+  
+  if (isValidHLS) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Invalid HLS file type. Allowed: ${ALLOWED_EXTENSIONS.hls.join(', ')}`), false);
+  }
+};
+
+const hlsUpload = multer({
+  storage: hlsStorage,
+  fileFilter: hlsFilter,
+  limits: { fileSize: MAX_HLS_FILE_SIZE } // 2GB max for HLS bundles
 });
 
 // =============================================================================
@@ -554,6 +611,323 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
       success: false,
       error: 'Internal Server Error',
       message: 'Failed to upload media'
+    });
+  }
+});
+
+/**
+ * POST /admin/media/hls
+ * Upload HLS video content (Admin only)
+ * Accepts a ZIP file containing .m3u8 playlist and .ts segment files
+ * Body: title, subtitle, language, contentGroupId, artistId, albumId
+ * File: multipart/form-data with 'hlsBundle' field (ZIP file)
+ */
+router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), async (req, res) => {
+  const mediaId = uuidv4();
+  let hlsDir = null;
+  
+  try {
+    const { title, subtitle, language = 'en', contentGroupId, artistId, albumId, duration } = req.body;
+    const file = req.file;
+    
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'No HLS bundle uploaded. Please upload a ZIP file containing .m3u8 and .ts files.'
+      });
+    }
+    
+    if (!title) {
+      // Clean up uploaded file
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Title is required'
+      });
+    }
+    
+    const ext = path.extname(file.originalname).toLowerCase();
+    
+    // Create HLS directory for this media
+    hlsDir = ensureHLSUploadDir(mediaId);
+    
+    // Variables to track HLS content
+    let playlistFilename = null;
+    let totalSize = 0;
+    let segmentCount = 0;
+    
+    if (ext === '.zip') {
+      // Extract ZIP file to HLS directory
+      console.log(`📦 Extracting HLS bundle to ${hlsDir}`);
+      
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(file.path)
+          .pipe(unzipper.Parse())
+          .on('entry', async (entry) => {
+            const fileName = path.basename(entry.path);
+            const fileExt = path.extname(fileName).toLowerCase();
+            
+            // Only extract .m3u8 and .ts files, ignore directories and other files
+            if (entry.type === 'File' && (fileExt === '.m3u8' || fileExt === '.ts')) {
+              const outputPath = path.join(hlsDir, fileName);
+              
+              // Track the playlist file
+              if (fileExt === '.m3u8') {
+                playlistFilename = fileName;
+              } else if (fileExt === '.ts') {
+                segmentCount++;
+              }
+              
+              entry.pipe(fs.createWriteStream(outputPath));
+              totalSize += entry.vars?.uncompressedSize || 0;
+            } else {
+              entry.autodrain();
+            }
+          })
+          .on('close', resolve)
+          .on('error', reject);
+      });
+      
+      // Clean up the temporary ZIP file
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      
+    } else if (ext === '.m3u8') {
+      // Single m3u8 file uploaded - move it to HLS directory
+      playlistFilename = file.filename;
+      fs.renameSync(file.path, path.join(hlsDir, playlistFilename));
+      totalSize = file.size;
+      
+    } else {
+      // Clean up and reject
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      if (hlsDir && fs.existsSync(hlsDir)) {
+        fs.rmSync(hlsDir, { recursive: true });
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Invalid file type. Please upload a ZIP file containing HLS content (.m3u8 and .ts files)'
+      });
+    }
+    
+    // Verify we have a playlist file
+    if (!playlistFilename) {
+      // Check if there's a .m3u8 file in the directory
+      const files = fs.readdirSync(hlsDir);
+      playlistFilename = files.find(f => f.endsWith('.m3u8'));
+      
+      if (!playlistFilename) {
+        // Clean up and reject
+        if (hlsDir && fs.existsSync(hlsDir)) {
+          fs.rmSync(hlsDir, { recursive: true });
+        }
+        return res.status(400).json({
+          success: false,
+          error: 'Bad Request',
+          message: 'No .m3u8 playlist file found in the uploaded bundle'
+        });
+      }
+    }
+    
+    // Calculate total size of all files in HLS directory
+    const hlsFiles = fs.readdirSync(hlsDir);
+    totalSize = hlsFiles.reduce((sum, filename) => {
+      const filePath = path.join(hlsDir, filename);
+      const stats = fs.statSync(filePath);
+      return sum + stats.size;
+    }, 0);
+    
+    segmentCount = hlsFiles.filter(f => f.endsWith('.ts')).length;
+    
+    // Construct the playlist URL
+    const playlistUrl = `${PRODUCTION_URL}/uploads/hls/${mediaId}/${playlistFilename}`;
+    
+    // Generate contentGroupId if not provided
+    const finalContentGroupId = contentGroupId || `cg_${Date.now()}_${uuidv4().substring(0, 8)}`;
+    
+    // Insert into database with HLS flag
+    await db.query(
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        mediaId,
+        title,
+        'video', // HLS is always video
+        playlistUrl, // Store playlist URL as file_path
+        language,
+        finalContentGroupId,
+        totalSize,
+        artistId || null,
+        albumId || null,
+        duration ? parseInt(duration) : null,
+        true, // is_hls = true
+        playlistUrl // hls_playlist_url
+      ]
+    );
+    
+    // Fetch the created media
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
+    
+    console.log(`✅ HLS upload complete: ${segmentCount} segments, playlist: ${playlistFilename}`);
+    
+    res.status(201).json({
+      success: true,
+      message: 'HLS media uploaded successfully',
+      data: {
+        ...media,
+        isHls: true,
+        hlsPlaylistUrl: playlistUrl,
+        segmentCount,
+        hlsDirectory: `/uploads/hls/${mediaId}/`
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error uploading HLS media:', error);
+    
+    // Clean up files on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    if (hlsDir && fs.existsSync(hlsDir)) {
+      fs.rmSync(hlsDir, { recursive: true });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to upload HLS media: ' + error.message
+    });
+  }
+});
+
+/**
+ * POST /admin/media/hls/segments
+ * Upload individual HLS segment files to an existing HLS media item
+ * Useful for adding segments one by one or resuming interrupted uploads
+ * Body: mediaId
+ * Files: multipart/form-data with 'segments' field (multiple .ts or .m3u8 files)
+ */
+router.post('/admin/media/hls/segments', checkAdminAuth, hlsUpload.array('segments', 500), async (req, res) => {
+  try {
+    const { mediaId } = req.body;
+    const files = req.files;
+    
+    if (!mediaId) {
+      // Clean up uploaded files
+      if (files) {
+        files.forEach(f => {
+          if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'mediaId is required'
+      });
+    }
+    
+    // Verify media exists and is HLS
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
+    if (!media) {
+      if (files) {
+        files.forEach(f => {
+          if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
+        });
+      }
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media not found'
+      });
+    }
+    
+    if (!files || files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'No segment files uploaded'
+      });
+    }
+    
+    // Ensure HLS directory exists
+    const hlsDir = ensureHLSUploadDir(mediaId);
+    
+    let addedFiles = [];
+    let playlistUpdated = false;
+    
+    for (const file of files) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      
+      if (ext === '.ts' || ext === '.m3u8') {
+        const destPath = path.join(hlsDir, file.originalname);
+        fs.renameSync(file.path, destPath);
+        addedFiles.push(file.originalname);
+        
+        if (ext === '.m3u8') {
+          playlistUpdated = true;
+          // Update playlist URL if this is a new/updated playlist
+          const playlistUrl = `${PRODUCTION_URL}/uploads/hls/${mediaId}/${file.originalname}`;
+          await db.query(
+            'UPDATE media SET hls_playlist_url = ?, file_path = ?, updated_at = NOW() WHERE id = ?',
+            [playlistUrl, playlistUrl, mediaId]
+          );
+        }
+      } else {
+        // Clean up invalid file
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      }
+    }
+    
+    // Update file size in database
+    const hlsFiles = fs.readdirSync(hlsDir);
+    const totalSize = hlsFiles.reduce((sum, filename) => {
+      const filePath = path.join(hlsDir, filename);
+      const stats = fs.statSync(filePath);
+      return sum + stats.size;
+    }, 0);
+    
+    await db.query(
+      'UPDATE media SET file_size = ?, updated_at = NOW() WHERE id = ?',
+      [totalSize, mediaId]
+    );
+    
+    res.json({
+      success: true,
+      message: `Added ${addedFiles.length} segment(s) to HLS media`,
+      data: {
+        mediaId,
+        addedFiles,
+        totalFiles: hlsFiles.length,
+        totalSize,
+        playlistUpdated
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error adding HLS segments:', error);
+    
+    // Clean up files
+    if (req.files) {
+      req.files.forEach(f => {
+        if (fs.existsSync(f.path)) fs.unlinkSync(f.path);
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to add HLS segments'
     });
   }
 });

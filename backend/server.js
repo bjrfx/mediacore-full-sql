@@ -5,11 +5,33 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const compression = require('compression');
 const db = require('./config/db');
 const { createStreamingRoutes } = require('./middleware/mediaStreamer');
 
 const app = express();
+
+// Ensure required upload directories exist
+const ensureDirectories = () => {
+  const dirs = [
+    path.join(__dirname, 'public/uploads'),
+    path.join(__dirname, 'public/uploads/video'),
+    path.join(__dirname, 'public/uploads/audio'),
+    path.join(__dirname, 'public/uploads/subtitles'),
+    path.join(__dirname, 'public/uploads/hls'),
+    path.join(__dirname, 'public/uploads/temp'),
+  ];
+  
+  dirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`📁 Created directory: ${dir}`);
+    }
+  });
+};
+
+ensureDirectories();
 
 // Middleware
 app.use(cors({ 
@@ -43,6 +65,27 @@ app.use('/public', express.static(path.join(__dirname, 'public'), {
 // Media streaming with Range request support (must be before static)
 const uploadsDir = path.join(__dirname, 'public', 'uploads');
 createStreamingRoutes(app, uploadsDir);
+
+// HLS streaming support - serve .m3u8 and .ts files with proper headers
+app.use('/uploads/hls', express.static(path.join(__dirname, 'public/uploads/hls'), {
+  maxAge: '1h', // Shorter cache for HLS to allow updates
+  etag: true,
+  setHeaders: (res, filePath) => {
+    // Set proper MIME types for HLS files
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.m3u8') {
+      res.set('Content-Type', 'application/vnd.apple.mpegurl');
+    } else if (ext === '.ts') {
+      res.set('Content-Type', 'video/MP2T');
+    }
+    // Enable CORS for HLS streaming
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Range, Accept, Content-Type');
+    res.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+    res.set('Accept-Ranges', 'bytes');
+  }
+}));
 
 // Static uploads fallback (for thumbnails and other files)
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {

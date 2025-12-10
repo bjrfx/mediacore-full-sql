@@ -12,6 +12,7 @@ import {
   Play,
   Eye,
   Subtitles,
+  PlayCircle,
 } from 'lucide-react';
 import { publicApi, adminApi } from '../../services/api';
 import { useUIStore } from '../../store';
@@ -283,16 +284,25 @@ export default function AdminMedia() {
                     </div>
                   </SimpleTableCell>
                   <SimpleTableCell>
-                    <Badge
-                      variant={media.type === 'video' ? 'default' : 'secondary'}
-                    >
-                      {media.type === 'video' ? (
-                        <Film className="h-3 w-3 mr-1" />
-                      ) : (
-                        <Music className="h-3 w-3 mr-1" />
+                    <div className="flex items-center gap-1">
+                      <Badge
+                        variant={media.type === 'video' ? 'default' : 'secondary'}
+                      >
+                        {media.isHls ? (
+                          <PlayCircle className="h-3 w-3 mr-1" />
+                        ) : media.type === 'video' ? (
+                          <Film className="h-3 w-3 mr-1" />
+                        ) : (
+                          <Music className="h-3 w-3 mr-1" />
+                        )}
+                        {media.type}
+                      </Badge>
+                      {media.isHls && (
+                        <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                          HLS
+                        </Badge>
                       )}
-                      {media.type}
-                    </Badge>
+                    </div>
                   </SimpleTableCell>
                   <SimpleTableCell className="hidden md:table-cell">
                     {formatFileSize(media.fileSize)}
@@ -395,12 +405,18 @@ export default function AdminMedia() {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-                <Badge
-                  className="absolute top-2 left-2"
-                  variant={media.type === 'video' ? 'default' : 'secondary'}
-                >
-                  {media.type}
-                </Badge>
+                <div className="absolute top-2 left-2 flex items-center gap-1">
+                  <Badge
+                    variant={media.type === 'video' ? 'default' : 'secondary'}
+                  >
+                    {media.type}
+                  </Badge>
+                  {media.isHls && (
+                    <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                      HLS
+                    </Badge>
+                  )}
+                </div>
               </div>
               <CardContent className="p-3">
                 <p className="font-medium truncate">{media.title}</p>
