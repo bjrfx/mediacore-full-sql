@@ -234,12 +234,17 @@ router.get('/api/artists/:id/media', checkApiKeyPermissions(), async (req, res) 
       fileUrl: item.file_path,
       filePath: item.file_path,
       fileSize: item.file_size,
-      thumbnailUrl: item.thumbnail_url,
+      thumbnail: item.thumbnail,
+      thumbnailUrl: item.thumbnail,
       duration: item.duration,
       artistId: item.artist_id,
+      artistName: artist.name,
       albumId: item.album_id,
       language: item.language,
       contentGroupId: item.content_group_id,
+      trackNumber: item.track_number,
+      isHls: item.is_hls || false,
+      hlsPlaylistUrl: item.hls_playlist_url,
       createdAt: item.created_at,
       updatedAt: item.updated_at
     }));

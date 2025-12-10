@@ -52,17 +52,23 @@ export default function AlbumPage() {
   });
 
   const album = albumData?.data;
-  const artist = album?.artist;
+  // Artist info - can be a full object or just name/id fields
+  const artist = album?.artist || (album?.artistId ? {
+    id: album.artistId,
+    name: album.artistName || '',
+    image: null
+  } : null);
   
   // Enrich tracks with artist and album info for the player
   const albumTracks = useMemo(() => {
     const tracks = tracksData?.data || [];
     return tracks.map(track => ({
       ...track,
-      artistName: artist?.name || "",
-      artistId: artist?.id || album?.artistId,
-      albumTitle: album?.title || "",
-      albumCover: album?.coverImage || "",
+      // Use artistName from track if available, otherwise from artist/album
+      artistName: track.artistName || artist?.name || album?.artistName || '',
+      artistId: track.artistId || artist?.id || album?.artistId,
+      albumTitle: track.albumTitle || album?.title || album?.name || "",
+      albumCover: track.albumCover || album?.coverImage || "",
     }));
   }, [tracksData?.data, artist, album]);
 

@@ -249,6 +249,10 @@ export const publicApi = {
     const response = await api.get(`/api/artists/${artistId}/media?${params}`, {
       headers: { 'x-api-key': API_KEY },
     });
+    // Normalize the media items in the response
+    if (response.data?.data && Array.isArray(response.data.data)) {
+      response.data.data = response.data.data.map(normalizeMediaItem);
+    }
     return response.data;
   },
 
@@ -279,6 +283,10 @@ export const publicApi = {
     const response = await api.get(`/api/albums/${albumId}/media`, {
       headers: { 'x-api-key': API_KEY },
     });
+    // Normalize the media items in the response
+    if (response.data?.data && Array.isArray(response.data.data)) {
+      response.data.data = response.data.data.map(normalizeMediaItem);
+    }
     return response.data;
   },
 

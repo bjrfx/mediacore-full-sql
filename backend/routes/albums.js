@@ -77,17 +77,23 @@ router.get('/api/albums', checkApiKeyPermissions(), async (req, res) => {
 
 /**
  * GET /api/albums/:id
- * Get single album by ID with track count
+ * Get single album by ID with track count and artist info
  */
 router.get('/api/albums/:id', checkApiKeyPermissions(), async (req, res) => {
   try {
     const { id } = req.params;
     
+    // Get album with artist info joined
     const albums = await db.query(`
       SELECT 
         a.*,
+        ar.id as artist_id_ref,
+        ar.name as artist_name_ref,
+        ar.description as artist_bio,
+        ar.image_url as artist_image,
         (SELECT COUNT(*) FROM media WHERE album_id = a.id) as track_count
       FROM albums a
+      LEFT JOIN artists ar ON a.artist_id = ar.id
       WHERE a.id = ?
     `, [id]);
     
@@ -101,13 +107,23 @@ router.get('/api/albums/:id', checkApiKeyPermissions(), async (req, res) => {
     
     const album = albums[0];
     
+    // Build artist object if artist exists
+    const artist = album.artist_id ? {
+      id: album.artist_id,
+      name: album.artist_name_ref || album.artist_name,
+      bio: album.artist_bio,
+      image: album.artist_image,
+      imageUrl: album.artist_image
+    } : null;
+    
     // Transform to camelCase
     const transformedAlbum = {
       id: album.id,
       name: album.name,
       title: album.name,
       artistId: album.artist_id,
-      artistName: album.artist_name,
+      artistName: album.artist_name_ref || album.artist_name,
+      artist: artist,
       coverImage: album.cover_image_url,
       coverImageUrl: album.cover_image_url,
       year: album.year,
@@ -140,8 +156,13 @@ router.get('/api/albums/:id/media', checkApiKeyPermissions(), async (req, res) =
   try {
     const { id } = req.params;
     
-    // Verify album exists
-    const album = await db.queryOne('SELECT * FROM albums WHERE id = ?', [id]);
+    // Verify album exists and get artist info
+    const album = await db.queryOne(`
+      SELECT a.*, ar.name as artist_name 
+      FROM albums a 
+      LEFT JOIN artists ar ON a.artist_id = ar.id 
+      WHERE a.id = ?
+    `, [id]);
     if (!album) {
       return res.status(404).json({
         success: false,
@@ -150,17 +171,50 @@ router.get('/api/albums/:id/media', checkApiKeyPermissions(), async (req, res) =
       });
     }
     
-    // Get media for this album
+    // Get media for this album with track number ordering
     const media = await db.query(
-      'SELECT * FROM media WHERE album_id = ? ORDER BY created_at DESC',
+      'SELECT * FROM media WHERE album_id = ? ORDER BY track_number ASC, created_at DESC',
       [id]
     );
     
+    // Transform to camelCase for frontend
+    const transformedMedia = media.map(item => ({
+      id: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      type: item.type,
+      fileUrl: item.file_path,
+      filePath: item.file_path,
+      fileSize: item.file_size,
+      thumbnail: item.thumbnail,
+      thumbnailUrl: item.thumbnail,
+      duration: item.duration,
+      artistId: item.artist_id,
+      artistName: album.artist_name || '',
+      albumId: item.album_id,
+      albumTitle: album.name,
+      language: item.language,
+      contentGroupId: item.content_group_id,
+      trackNumber: item.track_number,
+      isHls: item.is_hls || false,
+      hlsPlaylistUrl: item.hls_playlist_url,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    }));
+    
     res.json({
       success: true,
-      album,
-      count: media.length,
-      data: media
+      album: {
+        id: album.id,
+        name: album.name,
+        title: album.name,
+        artistId: album.artist_id,
+        artistName: album.artist_name,
+        coverImage: album.cover_image_url,
+        coverImageUrl: album.cover_image_url
+      },
+      count: transformedMedia.length,
+      data: transformedMedia
     });
   } catch (error) {
     console.error('Error fetching album media:', error);
