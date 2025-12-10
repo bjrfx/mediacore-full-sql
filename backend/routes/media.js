@@ -626,7 +626,7 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
   let hlsDir = null;
   
   try {
-    const { title, subtitle, language = 'en', contentGroupId, artistId, albumId, duration } = req.body;
+    const { title, subtitle, language = 'en', contentGroupId, artistId, albumId, duration, type = 'video', description } = req.body;
     const file = req.file;
     
     if (!file) {
@@ -752,14 +752,17 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
     // Generate contentGroupId if not provided
     const finalContentGroupId = contentGroupId || `cg_${Date.now()}_${uuidv4().substring(0, 8)}`;
     
+    // Validate type (only 'video' or 'audio' allowed)
+    const mediaType = ['video', 'audio'].includes(type) ? type : 'video';
+    
     // Insert into database with HLS flag
     await db.query(
-      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, description, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
         title,
-        'video', // HLS is always video
+        mediaType,
         playlistUrl, // Store playlist URL as file_path
         language,
         finalContentGroupId,
@@ -768,7 +771,8 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
         albumId || null,
         duration ? parseInt(duration) : null,
         true, // is_hls = true
-        playlistUrl // hls_playlist_url
+        playlistUrl, // hls_playlist_url
+        description || null
       ]
     );
     

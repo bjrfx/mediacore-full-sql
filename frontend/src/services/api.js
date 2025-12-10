@@ -347,7 +347,7 @@ export const adminApi = {
 
   // Upload HLS media bundle (ZIP file containing .m3u8 and .ts files)
   uploadHLSMedia: async (hlsBundle, title, options = {}) => {
-    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, onProgress } = options;
+    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, type = 'video', description, onProgress } = options;
     const token = localStorage.getItem('accessToken');
     
     const formData = new FormData();
@@ -355,12 +355,14 @@ export const adminApi = {
     formData.append('title', title);
     formData.append('subtitle', subtitle);
     formData.append('language', language);
+    formData.append('type', type);
+    if (description) formData.append('description', description);
     if (artistId) formData.append('artistId', artistId);
     if (albumId) formData.append('albumId', albumId);
     if (contentGroupId) formData.append('contentGroupId', contentGroupId);
     if (duration) formData.append('duration', duration.toString());
 
-    console.log('[API] HLS Upload:', { fileName: hlsBundle.name, fileSize: hlsBundle.size, title, language });
+    console.log('[API] HLS Upload:', { fileName: hlsBundle.name, fileSize: hlsBundle.size, title, language, type });
 
     const response = await api.post('/admin/media/hls', formData, {
       headers: {

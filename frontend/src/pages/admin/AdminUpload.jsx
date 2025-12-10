@@ -108,6 +108,12 @@ export default function AdminUpload() {
   const [hlsUploadProgress, setHlsUploadProgress] = useState(0);
   const [hlsSelectedArtistId, setHlsSelectedArtistId] = useState('');
   const [hlsSelectedAlbumId, setHlsSelectedAlbumId] = useState('');
+  const [hlsType, setHlsType] = useState('video');
+  const [hlsContentGroupId, setHlsContentGroupId] = useState(null);
+  const [hlsSubtitleFile, setHlsSubtitleFile] = useState(null);
+  const [hlsSubtitleLanguage, setHlsSubtitleLanguage] = useState('en');
+  const [hlsSubtitleLabel, setHlsSubtitleLabel] = useState('');
+  const [hlsIsDefaultSubtitle, setHlsIsDefaultSubtitle] = useState(true);
   
   // Multi-language upload state
   const [multiFiles, setMultiFiles] = useState([]); // [{file, language, progress, status}]
@@ -321,22 +327,49 @@ export default function AdminUpload() {
     setHlsUploadProgress(0);
     setHlsSelectedArtistId('');
     setHlsSelectedAlbumId('');
+    setHlsType('video');
+    setHlsContentGroupId(null);
+    setHlsSubtitleFile(null);
+    setHlsSubtitleLanguage('en');
+    setHlsSubtitleLabel('');
+    setHlsIsDefaultSubtitle(true);
   };
 
   // HLS Upload mutation
   const hlsUploadMutation = useMutation({
     mutationFn: ({ hlsBundle, title, options }) =>
       adminApi.uploadHLSMedia(hlsBundle, title, options),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries(['media']);
       queryClient.invalidateQueries(['admin-media']);
+      
+      const mediaId = data?.data?.id;
+      
+      // Upload subtitle if provided
+      if (mediaId && hlsSubtitleFile) {
+        try {
+          await adminApi.uploadSubtitle(mediaId, hlsSubtitleFile, {
+            language: hlsSubtitleLanguage,
+            label: hlsSubtitleLabel || undefined,
+            isDefault: hlsIsDefaultSubtitle,
+          });
+          queryClient.invalidateQueries(['subtitles', mediaId]);
+          addToast({ message: 'Subtitle uploaded successfully!', type: 'success' });
+        } catch (error) {
+          console.error('Failed to upload subtitle:', error);
+          addToast({
+            message: 'HLS uploaded but subtitle upload failed: ' + (error.response?.data?.message || error.message),
+            type: 'warning',
+          });
+        }
+      }
       
       // Add to recent uploads
       const langInfo = LANGUAGES.find(l => l.code === hlsLanguage) || { name: hlsLanguage };
       setRecentUploads(prev => [{
-        id: data?.data?.id,
+        id: mediaId,
         title: hlsTitle,
-        type: 'video',
+        type: hlsType,
         language: hlsLanguage,
         languageName: langInfo.name,
         isHls: true,
@@ -347,7 +380,7 @@ export default function AdminUpload() {
       
       resetHlsForm();
       addToast({ 
-        message: `HLS video uploaded successfully! (${data?.data?.segmentCount || 0} segments)`, 
+        message: `HLS ${hlsType} uploaded successfully! (${data?.data?.segmentCount || 0} segments)`, 
         type: 'success' 
       });
     },
@@ -1109,10 +1142,10 @@ export default function AdminUpload() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <PlayCircle className="h-5 w-5 text-primary" />
-                Upload HLS Streaming Video
+                Upload HLS Streaming Media
               </CardTitle>
               <CardDescription>
-                Upload a ZIP file containing your HLS video bundle (.m3u8 playlist and .ts segment files).
+                Upload a ZIP file containing your HLS bundle (.m3u8 playlist and .ts segment files).
                 The folder structure will be preserved for streaming.
               </CardDescription>
             </CardHeader>
@@ -1256,7 +1289,7 @@ export default function AdminUpload() {
           {/* HLS Media Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Video Details</CardTitle>
+              <CardTitle>Media Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1264,14 +1297,14 @@ export default function AdminUpload() {
                   <Label htmlFor="hls-title">Title *</Label>
                   <Input
                     id="hls-title"
-                    placeholder="Enter video title"
+                    placeholder="Enter media title"
                     value={hlsTitle}
                     onChange={(e) => setHlsTitle(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="hls-language">Language</Label>
+                  <Label htmlFor="hls-language">Language *</Label>
                   <Select value={hlsLanguage} onValueChange={setHlsLanguage}>
                     <SelectTrigger id="hls-language">
                       <SelectValue placeholder="Select language" />
@@ -1290,93 +1323,339 @@ export default function AdminUpload() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="hls-description">Description</Label>
+                <Textarea
+                  id="hls-description"
+                  placeholder="Enter a description (optional)"
+                  value={hlsSubtitle}
+                  onChange={(e) => setHlsSubtitle(e.target.value)}
+                  rows={3}
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="hls-subtitle">Subtitle/Description</Label>
-                  <Input
-                    id="hls-subtitle"
-                    placeholder="Optional subtitle or description"
-                    value={hlsSubtitle}
-                    onChange={(e) => setHlsSubtitle(e.target.value)}
-                  />
+                  <Label htmlFor="hls-type">Media Type</Label>
+                  <Select value={hlsType} onValueChange={setHlsType}>
+                    <SelectTrigger id="hls-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="video">
+                        <span className="flex items-center gap-2">
+                          <Film className="h-4 w-4" />
+                          Video
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="audio">
+                        <span className="flex items-center gap-2">
+                          <Music className="h-4 w-4" />
+                          Audio
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="hls-duration">Duration (seconds)</Label>
                   <Input
                     id="hls-duration"
                     type="number"
-                    placeholder="Optional: video duration in seconds"
+                    placeholder="Optional: duration in seconds"
                     value={hlsDuration}
                     onChange={(e) => setHlsDuration(e.target.value)}
                   />
                 </div>
               </div>
 
-              {/* Artist/Album Selection for HLS */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Link to existing content group for HLS */}
+              {contentGroups.length > 0 && (
                 <div className="space-y-2">
-                  <Label htmlFor="hls-artist">Artist (Optional)</Label>
-                  <Select value={hlsSelectedArtistId} onValueChange={setHlsSelectedArtistId}>
-                    <SelectTrigger id="hls-artist">
-                      <SelectValue placeholder="Select artist" />
+                  <Label>Link to Existing Content (for language versions)</Label>
+                  <Select value={hlsContentGroupId || "new"} onValueChange={(v) => setHlsContentGroupId(v === "new" ? null : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Create new content or link to existing" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No Artist</SelectItem>
-                      {artists.map((artist) => (
-                        <SelectItem key={artist.id} value={artist.id}>
+                      <SelectItem value="new">
+                        <span className="flex items-center gap-2">
+                          <PlusCircle className="h-4 w-4" />
+                          New Content (no link)
+                        </span>
+                      </SelectItem>
+                      {contentGroups.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
                           <span className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            {artist.name}
+                            <Link2 className="h-4 w-4" />
+                            {group.title} ({group.languages.join(', ')})
                           </span>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {hlsContentGroupId && (
+                    <p className="text-xs text-muted-foreground">
+                      This upload will be linked as a language variant of the selected content.
+                    </p>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="hls-album">Album (Optional)</Label>
-                  <Select 
-                    value={hlsSelectedAlbumId} 
-                    onValueChange={setHlsSelectedAlbumId}
-                    disabled={!hlsSelectedArtistId}
-                  >
-                    <SelectTrigger id="hls-album">
-                      <SelectValue placeholder={hlsSelectedArtistId ? "Select album" : "Select artist first"} />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* HLS Subtitle/Lyrics Upload (Optional) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Subtitles className="h-5 w-5" />
+                Subtitles / Lyrics (Optional)
+              </CardTitle>
+              <CardDescription>
+                Upload SRT, VTT for synced lyrics/subtitles, or TXT for plain text
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Subtitle file input */}
+              <div className="space-y-2">
+                <Label>Subtitle/Lyrics File</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept=".srt,.vtt,.txt"
+                      onChange={(e) => {
+                        const selectedFile = e.target?.files?.[0];
+                        if (selectedFile) {
+                          const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+                          if (['srt', 'vtt', 'txt'].includes(ext)) {
+                            setHlsSubtitleFile(selectedFile);
+                            if (!hlsSubtitleLabel) {
+                              const name = selectedFile.name.replace(/\.[^/.]+$/, '');
+                              setHlsSubtitleLabel(name);
+                            }
+                          } else {
+                            addToast({
+                              message: 'Please upload a subtitle file (.srt, .vtt, or .txt)',
+                              type: 'error',
+                            });
+                          }
+                        }
+                      }}
+                      className="hidden"
+                      id="hls-subtitle-upload"
+                    />
+                    <label
+                      htmlFor="hls-subtitle-upload"
+                      className={cn(
+                        'flex items-center gap-2 p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors',
+                        hlsSubtitleFile
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                    >
+                      {hlsSubtitleFile ? (
+                        <>
+                          <FileText className="h-5 w-5 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{hlsSubtitleFile.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(hlsSubtitleFile.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setHlsSubtitleFile(null);
+                              setHlsSubtitleLabel('');
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            Click to upload .srt, .vtt, or .txt file
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {hlsSubtitleFile && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Subtitle Language</Label>
+                      <Select value={hlsSubtitleLanguage} onValueChange={setHlsSubtitleLanguage}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select language" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LANGUAGES.map((lang) => (
+                            <SelectItem key={lang.code} value={lang.code}>
+                              <span className="flex items-center gap-2">
+                                <Globe className="h-4 w-4" />
+                                {lang.name} ({lang.nativeName})
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Display Label</Label>
+                      <Input
+                        placeholder="e.g., English, English (CC)"
+                        value={hlsSubtitleLabel}
+                        onChange={(e) => setHlsSubtitleLabel(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="hls-default-subtitle"
+                      checked={hlsIsDefaultSubtitle}
+                      onChange={(e) => setHlsIsDefaultSubtitle(e.target.checked)}
+                      className="rounded border-input"
+                    />
+                    <Label htmlFor="hls-default-subtitle" className="text-sm font-normal">
+                      Set as default subtitle track
+                    </Label>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+                    <strong>Format tips:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li><strong>SRT/VTT:</strong> Time-synced subtitles for video, Spotify-style lyrics for audio</li>
+                      <li><strong>TXT:</strong> Plain text lyrics (displayed without sync)</li>
+                    </ul>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* HLS Artist & Album Assignment */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Artist & Album (Optional)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Artist</Label>
+                <div className="flex gap-2">
+                  <Select value={hlsSelectedArtistId || "none"} onValueChange={(value) => {
+                    setHlsSelectedArtistId(value === "none" ? "" : value);
+                    setHlsSelectedAlbumId('');
+                  }}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select an artist" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No Album</SelectItem>
-                      {artistAlbums.map((album) => (
-                        <SelectItem key={album.id} value={album.id}>
-                          {album.title || album.name}
+                      <SelectItem value="none">No artist</SelectItem>
+                      {artists.map((artist) => (
+                        <SelectItem key={artist.id} value={artist.id}>
+                          {artist.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowNewArtistDialog(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
+
+              {hlsSelectedArtistId && (
+                <div className="space-y-2">
+                  <Label>Album</Label>
+                  <div className="flex gap-2">
+                    <Select value={hlsSelectedAlbumId || "none"} onValueChange={(value) => setHlsSelectedAlbumId(value === "none" ? "" : value)}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Select an album" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No album (singles)</SelectItem>
+                        {artistAlbums.map((album) => (
+                          <SelectItem key={album.id} value={album.id}>
+                            {album.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setShowNewAlbumDialog(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {hlsSelectedArtistId && (
+                <p className="text-xs text-muted-foreground">
+                  This media will be assigned to{' '}
+                  <strong>{artists.find(a => a.id === hlsSelectedArtistId)?.name}</strong>
+                  {hlsSelectedAlbumId && (
+                    <>
+                      {' '}in album{' '}
+                      <strong>{artistAlbums.find(a => a.id === hlsSelectedAlbumId)?.title}</strong>
+                    </>
+                  )}
+                </p>
+              )}
             </CardContent>
           </Card>
 
           {/* HLS Upload Progress */}
-          {hlsUploadProgress > 0 && hlsUploadProgress < 100 && (
+          {hlsUploadMutation.isPending && (
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="py-4">
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Uploading HLS bundle...</span>
                     <span>{hlsUploadProgress}%</span>
                   </div>
-                  <Progress value={hlsUploadProgress} className="h-2" />
+                  <Progress value={hlsUploadProgress} />
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* HLS Upload Button */}
-          <div className="flex justify-end">
+          {/* HLS Upload Buttons */}
+          <div className="flex gap-4">
             <Button
               type="button"
-              size="lg"
+              variant="outline"
+              onClick={resetHlsForm}
+              disabled={hlsUploadMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
               disabled={!hlsFile || !hlsTitle.trim() || hlsUploadMutation.isPending}
               onClick={() => {
                 if (!hlsFile || !hlsTitle.trim()) {
@@ -1388,9 +1667,12 @@ export default function AdminUpload() {
                   title: hlsTitle.trim(),
                   options: {
                     subtitle: hlsSubtitle.trim(),
+                    description: hlsSubtitle.trim(),
                     language: hlsLanguage,
+                    type: hlsType,
                     artistId: hlsSelectedArtistId || null,
                     albumId: hlsSelectedAlbumId || null,
+                    contentGroupId: hlsContentGroupId || null,
                     duration: hlsDuration ? parseInt(hlsDuration) : undefined,
                     onProgress: setHlsUploadProgress,
                   },
@@ -1405,7 +1687,7 @@ export default function AdminUpload() {
               ) : (
                 <>
                   <PlayCircle className="h-4 w-4 mr-2" />
-                  Upload HLS Video
+                  Upload HLS Media
                 </>
               )}
             </Button>
