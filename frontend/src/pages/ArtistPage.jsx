@@ -361,9 +361,9 @@ export default function ArtistPage() {
                         `bg-gradient-to-br ${generateGradient(track.id)}`
                       )}
                     >
-                      {track.thumbnailUrl && (
+                      {track.thumbnail && (
                         <img
-                          src={track.thumbnailUrl}
+                          src={track.thumbnail}
                           alt=""
                           className="w-full h-full object-cover rounded"
                         />

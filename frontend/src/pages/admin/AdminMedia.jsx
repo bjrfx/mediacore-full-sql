@@ -13,6 +13,10 @@ import {
   Eye,
   Subtitles,
   PlayCircle,
+  Upload,
+  X,
+  Loader2,
+  ImageIcon,
 } from 'lucide-react';
 import { publicApi, adminApi } from '../../services/api';
 import { useUIStore } from '../../store';
@@ -74,7 +78,11 @@ export default function AdminMedia() {
   const [editForm, setEditForm] = useState({ title: '', subtitle: '' });
   const [subtitleMediaId, setSubtitleMediaId] = useState(null);
   const [subtitleMediaTitle, setSubtitleMediaTitle] = useState('');
-  const [editThumbnailFile, setEditThumbnailFile] = useState(null);
+  
+  // Thumbnail edit state
+  const [newThumbnailFile, setNewThumbnailFile] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
 
   // Fetch media - always fetch all, then filter client-side
   // Backend may have issues with type filter parameter
@@ -111,18 +119,6 @@ export default function AdminMedia() {
     },
   });
 
-  const updateThumbMutation = useMutation({
-    mutationFn: ({ id, file }) => adminApi.updateThumbnail(id, file),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['media']);
-      setEditThumbnailFile(null);
-      addToast({ message: 'Thumbnail updated successfully', type: 'success' });
-    },
-    onError: (error) => {
-      addToast({ message: error.message || 'Failed to update thumbnail', type: 'error' });
-    },
-  });
-
   // Normalize media data: convert snake_case to camelCase for compatibility
   const normalizeMedia = (item) => ({
     ...item,
@@ -155,19 +151,53 @@ export default function AdminMedia() {
   const handleEdit = (media) => {
     setEditingMedia(media);
     setEditForm({ title: media.title, subtitle: media.subtitle || '' });
+    // Reset thumbnail state
+    setNewThumbnailFile(null);
+    setThumbnailPreview(null);
     setShowEditDialog(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editingMedia) {
+      // First update the text fields
       updateMutation.mutate({
         id: editingMedia.id,
         data: editForm,
       });
-      if (editThumbnailFile) {
-        updateThumbMutation.mutate({ id: editingMedia.id, file: editThumbnailFile });
+      
+      // If there's a new thumbnail to upload, do it
+      if (newThumbnailFile) {
+        setThumbnailUploading(true);
+        try {
+          await adminApi.uploadThumbnail(editingMedia.id, newThumbnailFile);
+          addToast({ message: 'Thumbnail updated successfully', type: 'success' });
+          queryClient.invalidateQueries(['media']);
+          queryClient.invalidateQueries(['admin-media']);
+        } catch (error) {
+          addToast({ message: 'Failed to upload thumbnail', type: 'error' });
+        }
+        setThumbnailUploading(false);
       }
     }
+  };
+
+  const handleRemoveThumbnail = async () => {
+    if (!editingMedia) return;
+    
+    setThumbnailUploading(true);
+    try {
+      await adminApi.removeThumbnail(editingMedia.id);
+      addToast({ message: 'Thumbnail removed successfully', type: 'success' });
+      // Update local state
+      setEditingMedia({ ...editingMedia, thumbnailUrl: null });
+      setThumbnailPreview(null);
+      setNewThumbnailFile(null);
+      queryClient.invalidateQueries(['media']);
+      queryClient.invalidateQueries(['admin-media']);
+    } catch (error) {
+      addToast({ message: 'Failed to remove thumbnail', type: 'error' });
+    }
+    setThumbnailUploading(false);
   };
 
   const handleDelete = (media) => {
@@ -283,13 +313,13 @@ export default function AdminMedia() {
                           `bg-gradient-to-br ${generateGradient(media.id)}`
                         )}
                       >
-                      {media.thumbnailUrl && (
-                        <img
-                          src={media.thumbnailUrl}
-                          alt=""
-                          className="w-full h-full object-cover rounded"
-                        />
-                      )}
+                        {media.thumbnail && (
+                          <img
+                            src={media.thumbnail}
+                            alt=""
+                            className="w-full h-full object-cover rounded"
+                          />
+                        )}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium truncate">{media.title}</p>
@@ -377,9 +407,9 @@ export default function AdminMedia() {
                   `bg-gradient-to-br ${generateGradient(media.id)}`
                 )}
               >
-                {media.thumbnailUrl && (
+                {media.thumbnail && (
                   <img
-                    src={media.thumbnailUrl}
+                    src={media.thumbnail}
                     alt={media.title}
                     className="w-full h-full object-cover"
                   />
@@ -447,7 +477,7 @@ export default function AdminMedia() {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Media</DialogTitle>
             <DialogDescription>
@@ -473,13 +503,71 @@ export default function AdminMedia() {
                 }
               />
             </div>
+            
+            {/* Thumbnail Section */}
             <div className="space-y-2">
-              <Label>Thumbnail (Optional)</Label>
-              <Input
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp"
-                onChange={(e) => setEditThumbnailFile(e.target?.files?.[0] || null)}
-              />
+              <Label className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" />
+                Thumbnail
+              </Label>
+              
+              {/* Current/Preview Thumbnail */}
+              {(thumbnailPreview || editingMedia?.thumbnailUrl) && (
+                <div className="relative inline-block">
+                  <img
+                    src={thumbnailPreview || editingMedia?.thumbnailUrl}
+                    alt="Thumbnail"
+                    className="w-32 h-32 object-cover rounded-lg border"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6"
+                    onClick={handleRemoveThumbnail}
+                    disabled={thumbnailUploading}
+                  >
+                    {thumbnailUploading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <X className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
+              )}
+              
+              {/* Upload New Thumbnail */}
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={(e) => {
+                    const selectedFile = e.target?.files?.[0];
+                    if (selectedFile) {
+                      setNewThumbnailFile(selectedFile);
+                      const previewUrl = URL.createObjectURL(selectedFile);
+                      setThumbnailPreview(previewUrl);
+                    }
+                  }}
+                  className="hidden"
+                  id="edit-thumbnail-upload"
+                />
+                <label
+                  htmlFor="edit-thumbnail-upload"
+                  className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                >
+                  <Upload className="h-4 w-4" />
+                  {thumbnailPreview || editingMedia?.thumbnailUrl ? 'Replace Thumbnail' : 'Upload Thumbnail'}
+                </label>
+                {newThumbnailFile && (
+                  <span className="text-sm text-muted-foreground self-center">
+                    {newThumbnailFile.name}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Recommended: Square or 16:9 aspect ratio, JPG/PNG/WebP, max 10MB
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -488,9 +576,16 @@ export default function AdminMedia() {
             </Button>
             <Button
               onClick={handleSaveEdit}
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || thumbnailUploading}
             >
-              {updateMutation.isPending ? 'Saving...' : 'Save'}
+              {updateMutation.isPending || thumbnailUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -546,5 +641,3 @@ export default function AdminMedia() {
     </div>
   );
 }
-
-

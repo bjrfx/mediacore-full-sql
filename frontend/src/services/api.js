@@ -316,7 +316,7 @@ export const publicApi = {
 export const adminApi = {
   // ---- Media Management ----
 
-  uploadMedia: async (file, title, subtitle = '', type = 'video', onProgress, artistId, albumId, language = 'en', contentGroupId = null, thumbnailFile = null) => {
+  uploadMedia: async (file, title, subtitle = '', type = 'video', onProgress, artistId, albumId, language = 'en', contentGroupId = null, thumbnail = null) => {
     const token = localStorage.getItem('accessToken');
     const formData = new FormData();
     formData.append('file', file);
@@ -327,9 +327,9 @@ export const adminApi = {
     if (artistId) formData.append('artistId', artistId);
     if (albumId) formData.append('albumId', albumId);
     if (contentGroupId) formData.append('contentGroupId', contentGroupId);
-    if (thumbnailFile) formData.append('thumbnail', thumbnailFile);
+    if (thumbnail) formData.append('thumbnail', thumbnail);
 
-    console.log('[API] Upload:', { fileName: file.name, fileType: file.type, title, type, language, artistId, albumId, contentGroupId });
+    console.log('[API] Upload:', { fileName: file.name, fileType: file.type, title, type, language, artistId, albumId, contentGroupId, hasThumbnail: !!thumbnail });
 
     const response = await api.post('/admin/media', formData, {
       headers: {
@@ -348,7 +348,7 @@ export const adminApi = {
 
   // Upload HLS media bundle (ZIP file containing .m3u8 and .ts files)
   uploadHLSMedia: async (hlsBundle, title, options = {}) => {
-    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, type = 'video', description, onProgress, thumbnail } = options;
+    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, type = 'video', description, onProgress, thumbnail = null } = options;
     const token = localStorage.getItem('accessToken');
     
     const formData = new FormData();
@@ -359,10 +359,10 @@ export const adminApi = {
     formData.append('type', type);
     if (description) formData.append('description', description);
     if (artistId) formData.append('artistId', artistId);
+    if (thumbnail) formData.append('thumbnail', thumbnail);
     if (albumId) formData.append('albumId', albumId);
     if (contentGroupId) formData.append('contentGroupId', contentGroupId);
     if (duration) formData.append('duration', duration.toString());
-    if (thumbnail) formData.append('thumbnail', thumbnail);
 
     console.log('[API] HLS Upload:', { fileName: hlsBundle.name, fileSize: hlsBundle.size, title, language, type });
 
@@ -416,16 +416,31 @@ export const adminApi = {
     return response.data;
   },
 
-  updateThumbnail: async (id, file) => {
+  // Upload or update thumbnail for existing media
+  uploadThumbnail: async (mediaId, thumbnailFile, onProgress) => {
     const token = localStorage.getItem('accessToken');
     const formData = new FormData();
-    formData.append('thumbnail', file);
-    const response = await api.put(`/admin/media/${id}/thumbnail`, formData, {
+    formData.append('thumbnail', thumbnailFile);
+
+    const response = await api.put(`/admin/media/${mediaId}/thumbnail`, formData, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'multipart/form-data',
       },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress(percentCompleted);
+        }
+      },
     });
+    return response.data;
+  },
+
+  // Remove thumbnail from media
+  removeThumbnail: async (mediaId) => {
+    const headers = await getAuthHeaders();
+    const response = await api.delete(`/admin/media/${mediaId}/thumbnail`, { headers });
     return response.data;
   },
 

@@ -162,7 +162,7 @@ export default function Home() {
             className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group"
             onClick={() => playTrack(featuredItem, allMedia)}
           >
-            {/* Background */}
+            {/* Background - Always use ThumbnailFallback for featured card */}
             <div className="aspect-[1.5/1] sm:aspect-[2/1] md:aspect-[3/1] lg:aspect-[4/1] relative">
               <ThumbnailFallback
                 id={featuredItem.id}
@@ -257,9 +257,9 @@ export default function Home() {
                 className="group flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg overflow-hidden cursor-pointer transition-all duration-200"
               >
                 <div className="w-12 h-12 shrink-0">
-                  {item.thumbnailUrl ? (
+                  {item.thumbnail ? (
                     <img
-                      src={item.thumbnailUrl}
+                      src={item.thumbnail}
                       alt={item.title}
                       className="w-full h-full object-cover"
                     />
@@ -339,9 +339,9 @@ export default function Home() {
                 >
                   {/* Thumbnail */}
                   <div className="aspect-video rounded-lg overflow-hidden mb-2 relative">
-                    {item.thumbnailUrl ? (
+                    {item.thumbnail ? (
                       <img
-                        src={item.thumbnailUrl}
+                        src={item.thumbnail}
                         alt={item.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />

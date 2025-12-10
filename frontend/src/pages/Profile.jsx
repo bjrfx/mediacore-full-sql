@@ -87,7 +87,7 @@ const TopTrackItem = ({ track, rank, onPlay }) => (
     </span>
     <div className="relative">
       <img
-        src={track.thumbnailUrl || '/placeholder-album.jpg'}
+        src={track.thumbnail || '/placeholder-album.jpg'}
         alt={track.title}
         className="w-12 h-12 rounded object-cover"
       />
@@ -203,7 +203,7 @@ export default function Profile() {
         id: track.id,
         title: track.title,
         artist: track.artist,
-        thumbnailUrl: track.thumbnailUrl,
+        thumbnail: track.thumbnail,
         duration: track.duration,
         type: track.type,
       });
@@ -420,7 +420,7 @@ export default function Profile() {
                         id: track.mediaId,
                         title: track.title,
                         artist: track.artist || track.artistName,
-                        thumbnailUrl: track.thumbnailUrl || track.thumbnail,
+                        thumbnail: track.thumbnail,
                         playCount: track.playCount,
                       }}
                       rank={index + 1}

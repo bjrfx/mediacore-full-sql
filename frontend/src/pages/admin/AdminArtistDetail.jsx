@@ -663,9 +663,9 @@ export default function AdminArtistDetail() {
                           `bg-gradient-to-br ${generateGradient(track.id)}`
                         )}
                       >
-                        {track.thumbnailUrl && (
+                        {track.thumbnail && (
                           <img
-                            src={track.thumbnailUrl}
+                            src={track.thumbnail}
                             alt=""
                             className="w-full h-full object-cover rounded"
                           />
@@ -920,9 +920,9 @@ export default function AdminArtistDetail() {
                         `bg-gradient-to-br ${generateGradient(media.id)}`
                       )}
                     >
-                      {media.thumbnailUrl && (
+                      {media.thumbnail && (
                         <img
-                          src={media.thumbnailUrl}
+                          src={media.thumbnail}
                           alt=""
                           className="w-full h-full object-cover rounded"
                         />
@@ -1204,9 +1204,9 @@ function AlbumCard({
                               `bg-gradient-to-br ${generateGradient(track.id)}`
                             )}
                           >
-                            {track.thumbnailUrl && (
+                            {track.thumbnail && (
                               <img
-                                src={track.thumbnailUrl}
+                                src={track.thumbnail}
                                 alt=""
                                 className="w-full h-full object-cover rounded"
                               />

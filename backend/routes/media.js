@@ -42,9 +42,6 @@ const ALLOWED_MIME_TYPES = {
     'audio/wave', 'audio/x-m4a', 'audio/m4a', 'audio/mp4',
     'audio/aac', 'audio/x-aac', 'audio/ogg', 'audio/flac'
   ],
-  image: [
-    'image/jpeg', 'image/png', 'image/webp'
-  ],
   subtitle: [
     'text/plain', 'text/vtt', 'application/x-subrip',
     'text/srt', 'application/octet-stream'
@@ -59,7 +56,6 @@ const ALLOWED_MIME_TYPES = {
 const ALLOWED_EXTENSIONS = {
   video: ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.mpeg', '.mpg'],
   audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'],
-  image: ['.jpg', '.jpeg', '.png', '.webp'],
   subtitle: ['.srt', '.vtt', '.txt'],
   hls: ['.m3u8', '.ts', '.zip']
 };
@@ -85,24 +81,18 @@ const uploadPath = ensureUploadDir();
 // Multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Route thumbnails to a dedicated directory
-    if (file.fieldname === 'thumbnail') {
-      const thumbDir = path.join(uploadPath, 'thumbnails');
-      if (!fs.existsSync(thumbDir)) {
-        fs.mkdirSync(thumbDir, { recursive: true });
-      }
-      return cb(null, thumbDir);
-    }
-
     let type = req.body.type || req.query.type || 'video';
+    
     // Infer from file mimetype
     if (file.mimetype.startsWith('audio/')) {
       type = 'audio';
     }
+    
     const typeDir = path.join(uploadPath, type === 'audio' ? 'audio' : 'video');
     if (!fs.existsSync(typeDir)) {
       fs.mkdirSync(typeDir, { recursive: true });
     }
+    
     // Store detected type for later use
     req.detectedType = type;
     cb(null, typeDir);
@@ -119,17 +109,12 @@ const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
   const mimeType = file.mimetype.toLowerCase();
   
-  // Thumbnails: allow only image types
-  if (file.fieldname === 'thumbnail') {
-    const isValidImage = ALLOWED_EXTENSIONS.image.includes(ext) || ALLOWED_MIME_TYPES.image.includes(mimeType);
-    return isValidImage
-      ? cb(null, true)
-      : cb(new Error(`Invalid thumbnail type. Allowed: ${ALLOWED_EXTENSIONS.image.join(', ')}`), false);
-  }
-
-  // Main media file: video or audio
-  const isValidVideo = ALLOWED_EXTENSIONS.video.includes(ext) || ALLOWED_MIME_TYPES.video.includes(mimeType);
-  const isValidAudio = ALLOWED_EXTENSIONS.audio.includes(ext) || ALLOWED_MIME_TYPES.audio.includes(mimeType);
+  // Check if extension or mimetype is allowed
+  const isValidVideo = ALLOWED_EXTENSIONS.video.includes(ext) || 
+                        ALLOWED_MIME_TYPES.video.includes(mimeType);
+  const isValidAudio = ALLOWED_EXTENSIONS.audio.includes(ext) || 
+                        ALLOWED_MIME_TYPES.audio.includes(mimeType);
+  
   if (isValidVideo || isValidAudio) {
     cb(null, true);
   } else {
@@ -180,6 +165,55 @@ const subtitleUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB max for subtitles
 });
 
+// Thumbnail storage configuration
+const thumbnailStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const thumbnailDir = path.join(uploadPath, 'thumbnails');
+    if (!fs.existsSync(thumbnailDir)) {
+      fs.mkdirSync(thumbnailDir, { recursive: true });
+    }
+    cb(null, thumbnailDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueId = uuidv4();
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `thumb_${Date.now()}_${uniqueId}${ext}`);
+  }
+});
+
+// Thumbnail file filter
+const thumbnailFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mimeType = file.mimetype.toLowerCase();
+  
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  
+  const isValid = allowedExtensions.includes(ext) || allowedMimeTypes.includes(mimeType);
+  
+  if (isValid) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Invalid thumbnail file type. Allowed: ${allowedExtensions.join(', ')}`), false);
+  }
+};
+
+const thumbnailUpload = multer({
+  storage: thumbnailStorage,
+  fileFilter: thumbnailFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max for thumbnails
+});
+
+// Combined upload for media file + optional thumbnail
+const mediaUploadFields = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: MAX_FILE_SIZE }
+}).fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]);
+
 // HLS ZIP storage configuration (for uploading HLS bundles as ZIP)
 const hlsStorage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -217,6 +251,57 @@ const hlsUpload = multer({
   fileFilter: hlsFilter,
   limits: { fileSize: MAX_HLS_FILE_SIZE } // 2GB max for HLS bundles
 });
+
+// Combined HLS upload for bundle + optional thumbnail
+const hlsUploadWithThumbnail = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      if (file.fieldname === 'thumbnail') {
+        const thumbnailDir = path.join(uploadPath, 'thumbnails');
+        if (!fs.existsSync(thumbnailDir)) {
+          fs.mkdirSync(thumbnailDir, { recursive: true });
+        }
+        cb(null, thumbnailDir);
+      } else {
+        // HLS bundle goes to temp
+        const tempDir = path.join(uploadPath, 'temp');
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+        cb(null, tempDir);
+      }
+    },
+    filename: (req, file, cb) => {
+      const uniqueId = uuidv4();
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (file.fieldname === 'thumbnail') {
+        cb(null, `thumb_${Date.now()}_${uniqueId}${ext}`);
+      } else {
+        cb(null, `hls_${Date.now()}_${uniqueId}${ext}`);
+      }
+    }
+  }),
+  fileFilter: (req, file, cb) => {
+    if (file.fieldname === 'thumbnail') {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const mimeType = file.mimetype.toLowerCase();
+      const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      const isValid = allowedExtensions.includes(ext) || allowedMimeTypes.includes(mimeType);
+      cb(isValid ? null : new Error('Invalid thumbnail file type'), isValid);
+    } else {
+      // HLS bundle filter
+      const ext = path.extname(file.originalname).toLowerCase();
+      const mimeType = file.mimetype.toLowerCase();
+      const isValidHLS = ALLOWED_EXTENSIONS.hls.includes(ext) || ALLOWED_MIME_TYPES.hls.includes(mimeType);
+      cb(isValidHLS ? null : new Error('Invalid HLS file type'), isValidHLS);
+    }
+  },
+  limits: { fileSize: MAX_HLS_FILE_SIZE }
+}).fields([
+  { name: 'hlsBundle', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]);
 
 // =============================================================================
 // LANGUAGE INFORMATION
@@ -314,7 +399,8 @@ router.get('/api/feed', checkApiKeyPermissions(), async (req, res) => {
       fileUrl: row.file_path,
       filePath: row.file_path,
       fileSize: row.file_size,
-      thumbnailUrl: row.thumbnail_path || row.thumbnail_url,
+      thumbnailUrl: row.thumbnail,
+      isHls: row.is_hls,
       contentGroupId: row.content_group_id,
       subscriptionTier: row.subscription_tier,
       createdAt: row.created_at,
@@ -379,7 +465,8 @@ router.get('/api/media/:id', checkApiKeyPermissions(), async (req, res) => {
       fileUrl: row.file_path,
       filePath: row.file_path,
       fileSize: row.file_size,
-      thumbnailUrl: row.thumbnail_path || row.thumbnail_url,
+      thumbnailUrl: row.thumbnail,
+      isHls: row.is_hls,
       contentGroupId: row.content_group_id,
       subscriptionTier: row.subscription_tier,
       createdAt: row.created_at,
@@ -546,11 +633,11 @@ router.get('/api/media/:id/download', checkAdminAuth, async (req, res) => {
  * Body: title, subtitle, language, contentGroupId, type, artistId, albumId
  * File: multipart/form-data with 'file' field
  */
-router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
+router.post('/admin/media', checkAdminAuth, mediaUploadFields, async (req, res) => {
   try {
     const { title, subtitle, language = 'en', contentGroupId, artistId, albumId } = req.body;
-    const file = (req.files?.file && req.files.file[0]) || req.file;
-    const thumb = req.files?.thumbnail && req.files.thumbnail[0];
+    const file = req.files?.file?.[0];
+    const thumbnailFile = req.files?.thumbnail?.[0];
     
     // Get type from body, query, or detected type
     let type = req.body.type || req.query.type || req.detectedType || 'video';
@@ -561,6 +648,10 @@ router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCo
     }
     
     if (!file) {
+      // Clean up thumbnail if uploaded
+      if (thumbnailFile && fs.existsSync(thumbnailFile.path)) {
+        fs.unlinkSync(thumbnailFile.path);
+      }
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
@@ -569,8 +660,11 @@ router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCo
     }
     
     if (!title) {
-      // Clean up uploaded file
+      // Clean up uploaded files
       fs.unlinkSync(file.path);
+      if (thumbnailFile && fs.existsSync(thumbnailFile.path)) {
+        fs.unlinkSync(thumbnailFile.path);
+      }
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
@@ -584,14 +678,27 @@ router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCo
     // Construct file URL (file is already saved by multer to /home/masakali/.../backend/public/uploads/)
     const fileUrl = `${PRODUCTION_URL}/uploads/${type}/${file.filename}`;
     
+    // Construct thumbnail URL if provided
+    let thumbnailUrl = null;
+    if (thumbnailFile) {
+      // Move thumbnail to thumbnails directory
+      const thumbnailDir = path.join(uploadPath, 'thumbnails');
+      if (!fs.existsSync(thumbnailDir)) {
+        fs.mkdirSync(thumbnailDir, { recursive: true });
+      }
+      const thumbnailFilename = `thumb_${Date.now()}_${uuidv4()}${path.extname(thumbnailFile.originalname).toLowerCase()}`;
+      const thumbnailPath = path.join(thumbnailDir, thumbnailFilename);
+      fs.renameSync(thumbnailFile.path, thumbnailPath);
+      thumbnailUrl = `${PRODUCTION_URL}/uploads/thumbnails/${thumbnailFilename}`;
+    }
+    
     // Get file size from uploaded file
     const fileSize = file.size || 0;
     
     // Prepare media data  
     const mediaId = uuidv4();
-    const thumbnailUrl = thumb ? `${PRODUCTION_URL}/uploads/thumbnails/${thumb.filename}` : null;
-    await db.query(
-      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, thumbnail_path, created_at, updated_at) 
+    const result = await db.query(
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, thumbnail, created_at, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
@@ -619,9 +726,12 @@ router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCo
   } catch (error) {
     console.error('Error uploading media:', error);
     
-    // Clean up file if it was uploaded
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    // Clean up files if they were uploaded
+    if (req.files?.file?.[0] && fs.existsSync(req.files.file[0].path)) {
+      fs.unlinkSync(req.files.file[0].path);
+    }
+    if (req.files?.thumbnail?.[0] && fs.existsSync(req.files.thumbnail[0].path)) {
+      fs.unlinkSync(req.files.thumbnail[0].path);
     }
     
     res.status(500).json({
@@ -637,18 +747,22 @@ router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCo
  * Upload HLS video content (Admin only)
  * Accepts a ZIP file containing .m3u8 playlist and .ts segment files
  * Body: title, subtitle, language, contentGroupId, artistId, albumId
- * File: multipart/form-data with 'hlsBundle' field (ZIP file)
+ * File: multipart/form-data with 'hlsBundle' field (ZIP file) and optional 'thumbnail' field
  */
-router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), upload.fields([{ name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
+router.post('/admin/media/hls', checkAdminAuth, hlsUploadWithThumbnail, async (req, res) => {
   const mediaId = uuidv4();
   let hlsDir = null;
   
   try {
     const { title, subtitle, language = 'en', contentGroupId, artistId, albumId, duration, type = 'video', description } = req.body;
-    const file = req.file;
-    const thumb = req.files?.thumbnail && req.files.thumbnail[0];
+    const file = req.files?.hlsBundle?.[0];
+    const thumbnailFile = req.files?.thumbnail?.[0];
     
     if (!file) {
+      // Clean up thumbnail if uploaded
+      if (thumbnailFile && fs.existsSync(thumbnailFile.path)) {
+        fs.unlinkSync(thumbnailFile.path);
+      }
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
@@ -657,9 +771,12 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), u
     }
     
     if (!title) {
-      // Clean up uploaded file
+      // Clean up uploaded files
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
+      }
+      if (thumbnailFile && fs.existsSync(thumbnailFile.path)) {
+        fs.unlinkSync(thumbnailFile.path);
       }
       return res.status(400).json({
         success: false,
@@ -733,6 +850,9 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), u
       if (hlsDir && fs.existsSync(hlsDir)) {
         fs.rmSync(hlsDir, { recursive: true });
       }
+      if (thumbnailFile && fs.existsSync(thumbnailFile.path)) {
+        fs.unlinkSync(thumbnailFile.path);
+      }
       return res.status(400).json({
         success: false,
         error: 'Bad Request',
@@ -779,9 +899,15 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), u
     // Validate type (only 'video' or 'audio' allowed)
     const mediaType = ['video', 'audio'].includes(type) ? type : 'video';
     
-    const thumbnailUrl = thumb ? `${PRODUCTION_URL}/uploads/thumbnails/${thumb.filename}` : null;
+    // Handle thumbnail if provided
+    let thumbnailUrl = null;
+    if (thumbnailFile) {
+      thumbnailUrl = `${PRODUCTION_URL}/uploads/thumbnails/${thumbnailFile.filename}`;
+    }
+    
+    // Insert into database with HLS flag and thumbnail
     await db.query(
-      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, description, thumbnail_path, created_at, updated_at) 
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, description, thumbnail, created_at, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
@@ -804,7 +930,7 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), u
     // Fetch the created media
     const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [mediaId]);
     
-    console.log(`✅ HLS upload complete: ${segmentCount} segments, playlist: ${playlistFilename}`);
+    console.log(`✅ HLS upload complete: ${segmentCount} segments, playlist: ${playlistFilename}${thumbnailUrl ? ', with thumbnail' : ''}`);
     
     res.status(201).json({
       success: true,
@@ -814,7 +940,8 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), u
         isHls: true,
         hlsPlaylistUrl: playlistUrl,
         segmentCount,
-        hlsDirectory: `/uploads/hls/${mediaId}/`
+        hlsDirectory: `/uploads/hls/${mediaId}/`,
+        thumbnailUrl
       }
     });
     
@@ -822,8 +949,11 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), u
     console.error('Error uploading HLS media:', error);
     
     // Clean up files on error
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.files?.hlsBundle?.[0] && fs.existsSync(req.files.hlsBundle[0].path)) {
+      fs.unlinkSync(req.files.hlsBundle[0].path);
+    }
+    if (req.files?.thumbnail?.[0] && fs.existsSync(req.files.thumbnail[0].path)) {
+      fs.unlinkSync(req.files.thumbnail[0].path);
     }
     if (hlsDir && fs.existsSync(hlsDir)) {
       fs.rmSync(hlsDir, { recursive: true });
@@ -1002,13 +1132,14 @@ router.get('/admin/media', checkAdminAuth, async (req, res) => {
       subtitle: item.subtitle,
       type: item.type,
       filePath: item.file_path,
-      thumbnailUrl: item.thumbnail_url,
+      thumbnailUrl: item.thumbnail,
       fileSize: item.file_size,
       duration: item.duration,
       artistId: item.artist_id,
       albumId: item.album_id,
       language: item.language,
       contentGroupId: item.content_group_id,
+      isHls: item.is_hls,
       createdAt: item.created_at,
       updatedAt: item.updated_at
     }));
@@ -1075,29 +1206,151 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
 
 /**
  * PUT /admin/media/:id/thumbnail
- * Upload and set a new thumbnail image for an existing media item
+ * Upload or replace thumbnail for existing media (Admin only)
+ * File: multipart/form-data with 'thumbnail' field
+ * To remove thumbnail without uploading new one, send DELETE request instead
  */
-router.put('/admin/media/:id/thumbnail', checkAdminAuth, upload.single('thumbnail'), async (req, res) => {
+router.put('/admin/media/:id/thumbnail', checkAdminAuth, thumbnailUpload.single('thumbnail'), async (req, res) => {
   try {
     const { id } = req.params;
-    const media = await mediaDAO.getById(id);
-    if (!media) {
-      return res.status(404).json({ success: false, error: 'Not Found', message: 'Media content not found' });
-    }
-
     const file = req.file;
-    if (!file) {
-      return res.status(400).json({ success: false, error: 'Bad Request', message: 'No thumbnail uploaded' });
+    
+    // Check if media exists
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [id]);
+    
+    if (!media) {
+      // Clean up uploaded file
+      if (file && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media content not found'
+      });
     }
-
+    
+    if (!file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'No thumbnail file uploaded'
+      });
+    }
+    
+    // Delete old thumbnail if exists
+    if (media.thumbnail) {
+      try {
+        const urlParts = media.thumbnail.split('/');
+        const oldFilename = urlParts[urlParts.length - 1];
+        const oldPath = path.join(uploadPath, 'thumbnails', oldFilename);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+          console.log(`🗑️ Deleted old thumbnail: ${oldPath}`);
+        }
+      } catch (err) {
+        console.error('Error deleting old thumbnail:', err);
+        // Continue even if old file deletion fails
+      }
+    }
+    
+    // Construct new thumbnail URL
     const thumbnailUrl = `${PRODUCTION_URL}/uploads/thumbnails/${file.filename}`;
-    await db.query('UPDATE media SET thumbnail_path = ?, updated_at = NOW() WHERE id = ?', [thumbnailUrl, id]);
-
-    const updated = await mediaDAO.getById(id);
-    res.json({ success: true, message: 'Thumbnail updated successfully', data: updated });
+    
+    // Update database
+    await db.query(
+      'UPDATE media SET thumbnail = ?, updated_at = NOW() WHERE id = ?',
+      [thumbnailUrl, id]
+    );
+    
+    // Fetch updated media
+    const updatedMedia = await db.queryOne('SELECT * FROM media WHERE id = ?', [id]);
+    
+    res.json({
+      success: true,
+      message: 'Thumbnail updated successfully',
+      data: {
+        id: updatedMedia.id,
+        thumbnailUrl: updatedMedia.thumbnail,
+        updatedAt: updatedMedia.updated_at
+      }
+    });
+    
   } catch (error) {
     console.error('Error updating thumbnail:', error);
-    res.status(500).json({ success: false, error: 'Internal Server Error', message: 'Failed to update thumbnail' });
+    
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to update thumbnail'
+    });
+  }
+});
+
+/**
+ * DELETE /admin/media/:id/thumbnail
+ * Remove thumbnail from media (Admin only)
+ */
+router.delete('/admin/media/:id/thumbnail', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if media exists
+    const media = await db.queryOne('SELECT * FROM media WHERE id = ?', [id]);
+    
+    if (!media) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media content not found'
+      });
+    }
+    
+    if (!media.thumbnail) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Media has no thumbnail to remove'
+      });
+    }
+    
+    // Delete thumbnail file
+    try {
+      const urlParts = media.thumbnail.split('/');
+      const filename = urlParts[urlParts.length - 1];
+      const filePath = path.join(uploadPath, 'thumbnails', filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`🗑️ Deleted thumbnail: ${filePath}`);
+      }
+    } catch (err) {
+      console.error('Error deleting thumbnail file:', err);
+      // Continue even if file deletion fails
+    }
+    
+    // Update database to remove thumbnail reference
+    await db.query(
+      'UPDATE media SET thumbnail = NULL, updated_at = NOW() WHERE id = ?',
+      [id]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Thumbnail removed successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error removing thumbnail:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to remove thumbnail'
+    });
   }
 });
 

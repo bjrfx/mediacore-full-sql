@@ -66,9 +66,9 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
       {/* Thumbnail */}
       <div className="media-card-image">
         <div className="w-full h-full">
-          {media.thumbnailUrl ? (
+          {media.thumbnail ? (
             <img
-              src={media.thumbnailUrl}
+              src={media.thumbnail}
               alt={media.title}
               className="w-full h-full object-cover"
             />

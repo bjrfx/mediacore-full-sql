@@ -60,7 +60,7 @@ const useLibraryStore = create(
                 ...p,
                 tracks: [...p.tracks, track],
                 updatedAt: new Date().toISOString(),
-                coverImage: p.coverImage || track.thumbnailUrl || track.thumbnail || track.fileUrl,
+                coverImage: p.coverImage || track.thumbnail || track.fileUrl,
               };
             }
             return p;
