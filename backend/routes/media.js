@@ -670,14 +670,18 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
             const fileName = path.basename(entry.path);
             const fileExt = path.extname(fileName).toLowerCase();
             
-            // Only extract .m3u8 and .ts files, ignore directories and other files
-            if (entry.type === 'File' && (fileExt === '.m3u8' || fileExt === '.ts')) {
+            // Valid HLS file extensions: .m3u8 (playlist), .ts (MPEG-TS segments), 
+            // .m4s (fragmented MP4 segments), .m4a (audio init), .mp4 (init segments)
+            const validExtensions = ['.m3u8', '.ts', '.m4s', '.m4a', '.mp4'];
+            
+            // Only extract valid HLS files, ignore directories and other files
+            if (entry.type === 'File' && validExtensions.includes(fileExt)) {
               const outputPath = path.join(hlsDir, fileName);
               
               // Track the playlist file
               if (fileExt === '.m3u8') {
                 playlistFilename = fileName;
-              } else if (fileExt === '.ts') {
+              } else if (['.ts', '.m4s'].includes(fileExt)) {
                 segmentCount++;
               }
               
@@ -744,7 +748,8 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
       return sum + stats.size;
     }, 0);
     
-    segmentCount = hlsFiles.filter(f => f.endsWith('.ts')).length;
+    // Count segments (.ts for MPEG-TS, .m4s for fragmented MP4)
+    segmentCount = hlsFiles.filter(f => f.endsWith('.ts') || f.endsWith('.m4s')).length;
     
     // Construct the playlist URL
     const playlistUrl = `${PRODUCTION_URL}/uploads/hls/${mediaId}/${playlistFilename}`;
