@@ -345,9 +345,9 @@ export default function AlbumPage() {
                         `bg-gradient-to-br ${generateGradient(track.id)}`
                       )}
                     >
-                      {track.thumbnail && (
+                      {track.thumbnailUrl && (
                         <img
-                          src={track.thumbnail}
+                          src={track.thumbnailUrl}
                           alt=""
                           className="w-full h-full object-cover rounded"
                         />

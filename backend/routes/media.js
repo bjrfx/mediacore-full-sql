@@ -42,6 +42,9 @@ const ALLOWED_MIME_TYPES = {
     'audio/wave', 'audio/x-m4a', 'audio/m4a', 'audio/mp4',
     'audio/aac', 'audio/x-aac', 'audio/ogg', 'audio/flac'
   ],
+  image: [
+    'image/jpeg', 'image/png', 'image/webp'
+  ],
   subtitle: [
     'text/plain', 'text/vtt', 'application/x-subrip',
     'text/srt', 'application/octet-stream'
@@ -56,6 +59,7 @@ const ALLOWED_MIME_TYPES = {
 const ALLOWED_EXTENSIONS = {
   video: ['.mp4', '.mov', '.webm', '.avi', '.mkv', '.mpeg', '.mpg'],
   audio: ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac'],
+  image: ['.jpg', '.jpeg', '.png', '.webp'],
   subtitle: ['.srt', '.vtt', '.txt'],
   hls: ['.m3u8', '.ts', '.zip']
 };
@@ -81,18 +85,24 @@ const uploadPath = ensureUploadDir();
 // Multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    // Route thumbnails to a dedicated directory
+    if (file.fieldname === 'thumbnail') {
+      const thumbDir = path.join(uploadPath, 'thumbnails');
+      if (!fs.existsSync(thumbDir)) {
+        fs.mkdirSync(thumbDir, { recursive: true });
+      }
+      return cb(null, thumbDir);
+    }
+
     let type = req.body.type || req.query.type || 'video';
-    
     // Infer from file mimetype
     if (file.mimetype.startsWith('audio/')) {
       type = 'audio';
     }
-    
     const typeDir = path.join(uploadPath, type === 'audio' ? 'audio' : 'video');
     if (!fs.existsSync(typeDir)) {
       fs.mkdirSync(typeDir, { recursive: true });
     }
-    
     // Store detected type for later use
     req.detectedType = type;
     cb(null, typeDir);
@@ -109,12 +119,17 @@ const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname).toLowerCase();
   const mimeType = file.mimetype.toLowerCase();
   
-  // Check if extension or mimetype is allowed
-  const isValidVideo = ALLOWED_EXTENSIONS.video.includes(ext) || 
-                        ALLOWED_MIME_TYPES.video.includes(mimeType);
-  const isValidAudio = ALLOWED_EXTENSIONS.audio.includes(ext) || 
-                        ALLOWED_MIME_TYPES.audio.includes(mimeType);
-  
+  // Thumbnails: allow only image types
+  if (file.fieldname === 'thumbnail') {
+    const isValidImage = ALLOWED_EXTENSIONS.image.includes(ext) || ALLOWED_MIME_TYPES.image.includes(mimeType);
+    return isValidImage
+      ? cb(null, true)
+      : cb(new Error(`Invalid thumbnail type. Allowed: ${ALLOWED_EXTENSIONS.image.join(', ')}`), false);
+  }
+
+  // Main media file: video or audio
+  const isValidVideo = ALLOWED_EXTENSIONS.video.includes(ext) || ALLOWED_MIME_TYPES.video.includes(mimeType);
+  const isValidAudio = ALLOWED_EXTENSIONS.audio.includes(ext) || ALLOWED_MIME_TYPES.audio.includes(mimeType);
   if (isValidVideo || isValidAudio) {
     cb(null, true);
   } else {
@@ -299,7 +314,7 @@ router.get('/api/feed', checkApiKeyPermissions(), async (req, res) => {
       fileUrl: row.file_path,
       filePath: row.file_path,
       fileSize: row.file_size,
-      thumbnailUrl: row.thumbnail_url,
+      thumbnailUrl: row.thumbnail_path || row.thumbnail_url,
       contentGroupId: row.content_group_id,
       subscriptionTier: row.subscription_tier,
       createdAt: row.created_at,
@@ -364,7 +379,7 @@ router.get('/api/media/:id', checkApiKeyPermissions(), async (req, res) => {
       fileUrl: row.file_path,
       filePath: row.file_path,
       fileSize: row.file_size,
-      thumbnailUrl: row.thumbnail_url,
+      thumbnailUrl: row.thumbnail_path || row.thumbnail_url,
       contentGroupId: row.content_group_id,
       subscriptionTier: row.subscription_tier,
       createdAt: row.created_at,
@@ -531,10 +546,11 @@ router.get('/api/media/:id/download', checkAdminAuth, async (req, res) => {
  * Body: title, subtitle, language, contentGroupId, type, artistId, albumId
  * File: multipart/form-data with 'file' field
  */
-router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, res) => {
+router.post('/admin/media', checkAdminAuth, upload.fields([{ name: 'file', maxCount: 1 }, { name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   try {
     const { title, subtitle, language = 'en', contentGroupId, artistId, albumId } = req.body;
-    const file = req.file;
+    const file = (req.files?.file && req.files.file[0]) || req.file;
+    const thumb = req.files?.thumbnail && req.files.thumbnail[0];
     
     // Get type from body, query, or detected type
     let type = req.body.type || req.query.type || req.detectedType || 'video';
@@ -573,9 +589,10 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
     
     // Prepare media data  
     const mediaId = uuidv4();
-    const result = await db.query(
-      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    const thumbnailUrl = thumb ? `${PRODUCTION_URL}/uploads/thumbnails/${thumb.filename}` : null;
+    await db.query(
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, thumbnail_path, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
         title,
@@ -585,7 +602,8 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
         finalContentGroupId,
         fileSize,
         artistId || null,
-        albumId || null
+        albumId || null,
+        thumbnailUrl
       ]
     );
     
@@ -621,13 +639,14 @@ router.post('/admin/media', checkAdminAuth, upload.single('file'), async (req, r
  * Body: title, subtitle, language, contentGroupId, artistId, albumId
  * File: multipart/form-data with 'hlsBundle' field (ZIP file)
  */
-router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), async (req, res) => {
+router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), upload.fields([{ name: 'thumbnail', maxCount: 1 }]), async (req, res) => {
   const mediaId = uuidv4();
   let hlsDir = null;
   
   try {
     const { title, subtitle, language = 'en', contentGroupId, artistId, albumId, duration, type = 'video', description } = req.body;
     const file = req.file;
+    const thumb = req.files?.thumbnail && req.files.thumbnail[0];
     
     if (!file) {
       return res.status(400).json({
@@ -760,10 +779,10 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
     // Validate type (only 'video' or 'audio' allowed)
     const mediaType = ['video', 'audio'].includes(type) ? type : 'video';
     
-    // Insert into database with HLS flag
+    const thumbnailUrl = thumb ? `${PRODUCTION_URL}/uploads/thumbnails/${thumb.filename}` : null;
     await db.query(
-      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, description, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      `INSERT INTO media (id, title, type, file_path, language, content_group_id, file_size, artist_id, album_id, duration, is_hls, hls_playlist_url, description, thumbnail_path, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaId,
         title,
@@ -777,7 +796,8 @@ router.post('/admin/media/hls', checkAdminAuth, hlsUpload.single('hlsBundle'), a
         duration ? parseInt(duration) : null,
         true, // is_hls = true
         playlistUrl, // hls_playlist_url
-        description || null
+        description || null,
+        thumbnailUrl
       ]
     );
     
@@ -1050,6 +1070,34 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
       error: 'Internal Server Error',
       message: 'Failed to update media'
     });
+  }
+});
+
+/**
+ * PUT /admin/media/:id/thumbnail
+ * Upload and set a new thumbnail image for an existing media item
+ */
+router.put('/admin/media/:id/thumbnail', checkAdminAuth, upload.single('thumbnail'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const media = await mediaDAO.getById(id);
+    if (!media) {
+      return res.status(404).json({ success: false, error: 'Not Found', message: 'Media content not found' });
+    }
+
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'Bad Request', message: 'No thumbnail uploaded' });
+    }
+
+    const thumbnailUrl = `${PRODUCTION_URL}/uploads/thumbnails/${file.filename}`;
+    await db.query('UPDATE media SET thumbnail_path = ?, updated_at = NOW() WHERE id = ?', [thumbnailUrl, id]);
+
+    const updated = await mediaDAO.getById(id);
+    res.json({ success: true, message: 'Thumbnail updated successfully', data: updated });
+  } catch (error) {
+    console.error('Error updating thumbnail:', error);
+    res.status(500).json({ success: false, error: 'Internal Server Error', message: 'Failed to update thumbnail' });
   }
 });
 

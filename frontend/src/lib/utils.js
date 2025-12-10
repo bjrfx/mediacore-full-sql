@@ -83,11 +83,8 @@ export function truncateText(text, maxLength) {
 }
 
 export function getMediaThumbnail(media) {
-  // Return a placeholder or generate thumbnail URL
+  if (media?.thumbnailUrl) return media.thumbnailUrl;
   if (media?.thumbnail) return media.thumbnail;
-  
-  // For videos, we could generate a thumbnail from the video
-  // For now, return a gradient placeholder
   return null;
 }
 

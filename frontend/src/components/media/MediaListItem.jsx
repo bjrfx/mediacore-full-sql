@@ -66,9 +66,9 @@ export default function MediaListItem({ media, queue = [], index = 0, showIndex 
 
       {/* Thumbnail */}
       <div className="w-10 h-10 rounded shrink-0 overflow-hidden">
-        {media.thumbnail ? (
+        {media.thumbnailUrl ? (
           <img
-            src={media.thumbnail}
+            src={media.thumbnailUrl}
             alt={media.title}
             className="w-full h-full object-cover"
           />

@@ -316,7 +316,7 @@ export const publicApi = {
 export const adminApi = {
   // ---- Media Management ----
 
-  uploadMedia: async (file, title, subtitle = '', type = 'video', onProgress, artistId, albumId, language = 'en', contentGroupId = null) => {
+  uploadMedia: async (file, title, subtitle = '', type = 'video', onProgress, artistId, albumId, language = 'en', contentGroupId = null, thumbnailFile = null) => {
     const token = localStorage.getItem('accessToken');
     const formData = new FormData();
     formData.append('file', file);
@@ -327,6 +327,7 @@ export const adminApi = {
     if (artistId) formData.append('artistId', artistId);
     if (albumId) formData.append('albumId', albumId);
     if (contentGroupId) formData.append('contentGroupId', contentGroupId);
+    if (thumbnailFile) formData.append('thumbnail', thumbnailFile);
 
     console.log('[API] Upload:', { fileName: file.name, fileType: file.type, title, type, language, artistId, albumId, contentGroupId });
 
@@ -347,7 +348,7 @@ export const adminApi = {
 
   // Upload HLS media bundle (ZIP file containing .m3u8 and .ts files)
   uploadHLSMedia: async (hlsBundle, title, options = {}) => {
-    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, type = 'video', description, onProgress } = options;
+    const { subtitle = '', language = 'en', artistId, albumId, contentGroupId, duration, type = 'video', description, onProgress, thumbnail } = options;
     const token = localStorage.getItem('accessToken');
     
     const formData = new FormData();
@@ -361,6 +362,7 @@ export const adminApi = {
     if (albumId) formData.append('albumId', albumId);
     if (contentGroupId) formData.append('contentGroupId', contentGroupId);
     if (duration) formData.append('duration', duration.toString());
+    if (thumbnail) formData.append('thumbnail', thumbnail);
 
     console.log('[API] HLS Upload:', { fileName: hlsBundle.name, fileSize: hlsBundle.size, title, language, type });
 
@@ -411,6 +413,19 @@ export const adminApi = {
   updateMedia: async (id, data) => {
     const headers = await getAuthHeaders();
     const response = await api.put(`/admin/media/${id}`, data, { headers });
+    return response.data;
+  },
+
+  updateThumbnail: async (id, file) => {
+    const token = localStorage.getItem('accessToken');
+    const formData = new FormData();
+    formData.append('thumbnail', file);
+    const response = await api.put(`/admin/media/${id}/thumbnail`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 

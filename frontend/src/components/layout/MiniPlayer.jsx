@@ -564,9 +564,9 @@ function MiniPlayer() {
               {/* Album Art - hidden when lyrics are shown */}
               {!showLyrics && (
                 <div className="w-64 h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 rounded-xl shadow-2xl overflow-hidden flex-shrink-0">
-                  {currentTrack.thumbnail ? (
+                  {currentTrack.thumbnailUrl ? (
                     <img
-                      src={currentTrack.thumbnail}
+                      src={currentTrack.thumbnailUrl}
                       alt={currentTrack.title}
                       className="w-full h-full object-cover"
                     />
@@ -1118,9 +1118,9 @@ function MiniPlayer() {
         onClick={() => setExpanded(true)}
       >
         <div className="w-14 h-14 rounded-md overflow-hidden shrink-0 relative">
-          {currentTrack.thumbnail ? (
+          {currentTrack.thumbnailUrl ? (
             <img
-              src={currentTrack.thumbnail}
+              src={currentTrack.thumbnailUrl}
               alt={currentTrack.title}
               className="w-full h-full object-cover"
             />

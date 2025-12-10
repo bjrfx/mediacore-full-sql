@@ -164,20 +164,11 @@ export default function Home() {
           >
             {/* Background */}
             <div className="aspect-[1.5/1] sm:aspect-[2/1] md:aspect-[3/1] lg:aspect-[4/1] relative">
-              {featuredItem.thumbnail ? (
-                <img
-                  src={featuredItem.thumbnail}
-                  alt={featuredItem.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              ) : (
-                <ThumbnailFallback
-                  // title={featuredItem.title}
-                  id={featuredItem.id}
-                  isVideo={featuredItem.type === 'video'}
-                  size="large"
-                />
-              )}
+              <ThumbnailFallback
+                id={featuredItem.id}
+                isVideo={featuredItem.type === 'video'}
+                size="large"
+              />
               
               {/* Gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
@@ -266,9 +257,9 @@ export default function Home() {
                 className="group flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-lg overflow-hidden cursor-pointer transition-all duration-200"
               >
                 <div className="w-12 h-12 shrink-0">
-                  {item.thumbnail ? (
+                  {item.thumbnailUrl ? (
                     <img
-                      src={item.thumbnail}
+                      src={item.thumbnailUrl}
                       alt={item.title}
                       className="w-full h-full object-cover"
                     />
@@ -348,9 +339,9 @@ export default function Home() {
                 >
                   {/* Thumbnail */}
                   <div className="aspect-video rounded-lg overflow-hidden mb-2 relative">
-                    {item.thumbnail ? (
+                    {item.thumbnailUrl ? (
                       <img
-                        src={item.thumbnail}
+                        src={item.thumbnailUrl}
                         alt={item.title}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />

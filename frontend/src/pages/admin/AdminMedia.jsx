@@ -74,6 +74,7 @@ export default function AdminMedia() {
   const [editForm, setEditForm] = useState({ title: '', subtitle: '' });
   const [subtitleMediaId, setSubtitleMediaId] = useState(null);
   const [subtitleMediaTitle, setSubtitleMediaTitle] = useState('');
+  const [editThumbnailFile, setEditThumbnailFile] = useState(null);
 
   // Fetch media - always fetch all, then filter client-side
   // Backend may have issues with type filter parameter
@@ -107,6 +108,18 @@ export default function AdminMedia() {
     },
     onError: (error) => {
       addToast({ message: error.message || 'Failed to delete media', type: 'error' });
+    },
+  });
+
+  const updateThumbMutation = useMutation({
+    mutationFn: ({ id, file }) => adminApi.updateThumbnail(id, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['media']);
+      setEditThumbnailFile(null);
+      addToast({ message: 'Thumbnail updated successfully', type: 'success' });
+    },
+    onError: (error) => {
+      addToast({ message: error.message || 'Failed to update thumbnail', type: 'error' });
     },
   });
 
@@ -151,6 +164,9 @@ export default function AdminMedia() {
         id: editingMedia.id,
         data: editForm,
       });
+      if (editThumbnailFile) {
+        updateThumbMutation.mutate({ id: editingMedia.id, file: editThumbnailFile });
+      }
     }
   };
 
@@ -267,13 +283,13 @@ export default function AdminMedia() {
                           `bg-gradient-to-br ${generateGradient(media.id)}`
                         )}
                       >
-                        {media.thumbnail && (
-                          <img
-                            src={media.thumbnail}
-                            alt=""
-                            className="w-full h-full object-cover rounded"
-                          />
-                        )}
+                      {media.thumbnailUrl && (
+                        <img
+                          src={media.thumbnailUrl}
+                          alt=""
+                          className="w-full h-full object-cover rounded"
+                        />
+                      )}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium truncate">{media.title}</p>
@@ -361,9 +377,9 @@ export default function AdminMedia() {
                   `bg-gradient-to-br ${generateGradient(media.id)}`
                 )}
               >
-                {media.thumbnail && (
+                {media.thumbnailUrl && (
                   <img
-                    src={media.thumbnail}
+                    src={media.thumbnailUrl}
                     alt={media.title}
                     className="w-full h-full object-cover"
                   />
@@ -457,6 +473,14 @@ export default function AdminMedia() {
                 }
               />
             </div>
+            <div className="space-y-2">
+              <Label>Thumbnail (Optional)</Label>
+              <Input
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                onChange={(e) => setEditThumbnailFile(e.target?.files?.[0] || null)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowEditDialog(false)}>
@@ -522,3 +546,5 @@ export default function AdminMedia() {
     </div>
   );
 }
+
+

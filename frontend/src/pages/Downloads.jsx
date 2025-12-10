@@ -104,9 +104,9 @@ function DownloadItem({ download, onPlay, onRemove, onRetry }) {
         )}
         onClick={() => status === DownloadStatus.COMPLETED && onPlay(media)}
       >
-        {media?.thumbnail ? (
+        {media?.thumbnailUrl ? (
           <img
-            src={media.thumbnail}
+            src={media.thumbnailUrl}
             alt={media.title}
             className="w-full h-full object-cover"
           />

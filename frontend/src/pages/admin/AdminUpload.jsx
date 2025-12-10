@@ -98,6 +98,7 @@ export default function AdminUpload() {
   const [language, setLanguage] = useState('en');
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState(null);
   
   // HLS upload state
   const [hlsFile, setHlsFile] = useState(null);
@@ -114,6 +115,7 @@ export default function AdminUpload() {
   const [hlsSubtitleLanguage, setHlsSubtitleLanguage] = useState('en');
   const [hlsSubtitleLabel, setHlsSubtitleLabel] = useState('');
   const [hlsIsDefaultSubtitle, setHlsIsDefaultSubtitle] = useState(true);
+  const [hlsThumbnailFile, setHlsThumbnailFile] = useState(null);
   
   // Multi-language upload state
   const [multiFiles, setMultiFiles] = useState([]); // [{file, language, progress, status}]
@@ -227,8 +229,8 @@ export default function AdminUpload() {
 
   // Upload mutation - now includes language support
   const uploadMutation = useMutation({
-    mutationFn: ({ file, title, subtitle, type, artistId, albumId, language, contentGroupId }) =>
-      adminApi.uploadMedia(file, title, subtitle, type, setUploadProgress, artistId || null, albumId || null, language, contentGroupId),
+    mutationFn: ({ file, title, subtitle, type, artistId, albumId, language, contentGroupId, thumbnailFile }) =>
+      adminApi.uploadMedia(file, title, subtitle, type, setUploadProgress, artistId || null, albumId || null, language, contentGroupId, thumbnailFile || null),
     onSuccess: async (data) => {
       queryClient.invalidateQueries(['media']);
       queryClient.invalidateQueries(['admin-media']);
@@ -301,6 +303,7 @@ export default function AdminUpload() {
     setSelectedArtistId('');
     setSelectedAlbumId('');
     setContentGroupId(null);
+    setThumbnailFile(null);
     // Reset subtitle state
     setSubtitleFile(null);
     setSubtitleLanguage('en');
@@ -333,6 +336,7 @@ export default function AdminUpload() {
     setHlsSubtitleLanguage('en');
     setHlsSubtitleLabel('');
     setHlsIsDefaultSubtitle(true);
+    setHlsThumbnailFile(null);
   };
 
   // HLS Upload mutation
@@ -429,6 +433,18 @@ export default function AdminUpload() {
     }
   }, [title, addToast]);
 
+  const handleThumbnailChange = useCallback((e) => {
+    const f = e.target?.files?.[0];
+    if (f) {
+      const ext = f.name.split('.').pop()?.toLowerCase();
+      if (['jpg','jpeg','png','webp'].includes(ext)) {
+        setThumbnailFile(f);
+      } else {
+        addToast({ message: 'Please upload JPG, PNG, or WEBP image', type: 'error' });
+      }
+    }
+  }, [addToast]);
+
   // Handle subtitle file selection
   const handleSubtitleFileChange = useCallback((e) => {
     const selectedFile = e.target?.files?.[0];
@@ -449,6 +465,18 @@ export default function AdminUpload() {
       }
     }
   }, [subtitleLabel, addToast]);
+
+  const handleHlsThumbnailChange = useCallback((e) => {
+    const f = e.target?.files?.[0];
+    if (f) {
+      const ext = f.name.split('.').pop()?.toLowerCase();
+      if (['jpg','jpeg','png','webp'].includes(ext)) {
+        setHlsThumbnailFile(f);
+      } else {
+        addToast({ message: 'Please upload JPG, PNG, or WEBP image', type: 'error' });
+      }
+    }
+  }, [addToast]);
 
   // Handle file drop for multi-language upload
   const handleMultiFileDrop = useCallback((e, targetLanguage = null) => {
@@ -547,6 +575,7 @@ export default function AdminUpload() {
       artistId: selectedArtistId || null,
       albumId: selectedAlbumId || null,
       contentGroupId: contentGroupId || null,
+      thumbnailFile: thumbnailFile || null,
     });
   };
 
@@ -823,6 +852,58 @@ export default function AdminUpload() {
                     onChange={(e) => setSubtitle(e.target.value)}
                     rows={3}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Thumbnail (Optional)</Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.webp"
+                        onChange={handleThumbnailChange}
+                        className="hidden"
+                        id="thumbnail-upload"
+                      />
+                      <label
+                        htmlFor="thumbnail-upload"
+                        className={cn(
+                          'flex items-center gap-2 p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors',
+                          thumbnailFile
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        )}
+                      >
+                        {thumbnailFile ? (
+                          <>
+                            <Upload className="h-5 w-5 text-primary" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{thumbnailFile.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {(thumbnailFile.size / 1024).toFixed(1)} KB
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setThumbnailFile(null);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-5 w-5 text-muted-foreground" />
+                            <span className="text-muted-foreground">Click to upload JPG, PNG, or WEBP</span>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -1334,6 +1415,58 @@ export default function AdminUpload() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <Label>Thumbnail (Optional)</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp"
+                      onChange={handleHlsThumbnailChange}
+                      className="hidden"
+                      id="hls-thumbnail-upload"
+                    />
+                    <label
+                      htmlFor="hls-thumbnail-upload"
+                      className={cn(
+                        'flex items-center gap-2 p-3 rounded-lg border-2 border-dashed cursor-pointer transition-colors',
+                        hlsThumbnailFile
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      )}
+                    >
+                      {hlsThumbnailFile ? (
+                        <>
+                          <Upload className="h-5 w-5 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{hlsThumbnailFile.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(hlsThumbnailFile.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setHlsThumbnailFile(null);
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-muted-foreground">Click to upload JPG, PNG, or WEBP</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="hls-type">Media Type</Label>
@@ -1675,6 +1808,7 @@ export default function AdminUpload() {
                     contentGroupId: hlsContentGroupId || null,
                     duration: hlsDuration ? parseInt(hlsDuration) : undefined,
                     onProgress: setHlsUploadProgress,
+                    thumbnail: hlsThumbnailFile || null,
                   },
                 });
               }}
