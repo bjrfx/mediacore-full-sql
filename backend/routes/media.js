@@ -16,7 +16,6 @@ const multer = require('multer');
 const { mediaDAO } = require('../data/dao');
 const db = require('../config/db');
 const { checkAuth, checkAdminAuth, checkApiKeyPermissions } = require('../middleware');
-const archiver = require('archiver');
 const unzipper = require('unzipper');
 
 // =============================================================================
