@@ -347,3 +347,42 @@
 .focus-visible:focus {
   @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
 }
+
+/* Mobile-specific utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Safe area support for notched devices */
+.safe-area-bottom {
+  padding-bottom: max(0rem, env(safe-area-inset-bottom));
+}
+
+.safe-area-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+/* Touch target minimum size */
+.touch-target {
+  @apply min-h-[44px] min-w-[44px];
+}
+
+/* Mobile header pattern */
+.mobile-header {
+  @apply sticky top-0 z-30 bg-background/95 backdrop-blur-lg border-b border-border;
+}
+
+/* Category chip styles */
+.category-chip {
+  @apply px-4 py-2 rounded-full bg-secondary hover:bg-accent transition-colors text-sm font-medium whitespace-nowrap;
+}
+
+.category-chip-active {
+  @apply bg-primary text-primary-foreground shadow-lg;
+}
+

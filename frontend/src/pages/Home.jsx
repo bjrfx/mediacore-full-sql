@@ -42,6 +42,14 @@ export default function Home() {
   });
 
   const rawMedia = mediaData?.data || [];
+
+  // Fetch artists
+  const { data: artistsData, isLoading: artistsLoading } = useQuery({
+    queryKey: ['artists', 'home'],
+    queryFn: () => publicApi.getArtists({ limit: 20, orderBy: 'createdAt', order: 'desc' }),
+  });
+
+  const artists = artistsData?.data || [];
   
   // Get unique album IDs from media
   const albumIds = useMemo(() => {
@@ -470,6 +478,90 @@ export default function Home() {
               selectedLanguage={selectedLanguage}
               onLanguageSelect={setSelectedLanguage}
             />
+          </section>
+        )}
+
+        {/* Artists section - Horizontal Scroll */}
+        {(artists.length > 0 || artistsLoading) && (
+          <section className="w-full">
+            <div className="flex items-center justify-between mb-4 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                <h2 className="text-lg sm:text-xl font-bold truncate">Popular Artists</h2>
+              </div>
+              <Link 
+                to="/artists" 
+                className="text-xs sm:text-sm font-medium text-primary hover:text-primary/80 flex items-center gap-1 transition-colors flex-shrink-0"
+              >
+                View All <ChevronRight className="h-4 w-4" />
+              </Link>
+            </div>
+            
+            {/* Horizontal scrolling container */}
+            <div className="relative -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8">
+              <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory">
+                {artistsLoading ? (
+                  // Loading skeletons
+                  Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="flex-shrink-0 w-32 sm:w-36 md:w-40 snap-start">
+                      <div className="w-full aspect-square rounded-full bg-muted animate-pulse" />
+                      <div className="h-4 bg-muted rounded mt-2 animate-pulse" />
+                      <div className="h-3 bg-muted rounded mt-1 w-2/3 animate-pulse" />
+                    </div>
+                  ))
+                ) : (
+                  artists.map((artist, index) => (
+                    <Link
+                      key={artist.id}
+                      to={`/artist/${artist.id}`}
+                      className="flex-shrink-0 w-32 sm:w-36 md:w-40 snap-start group"
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: index * 0.05, duration: 0.2 }}
+                        className="w-full"
+                      >
+                        {/* Circular artist image */}
+                        <div className="w-full aspect-square rounded-full overflow-hidden mb-2 shadow-md hover:shadow-xl transition-shadow relative">
+                          {artist.imageUrl ? (
+                            <img
+                              src={artist.imageUrl}
+                              alt={artist.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-background flex items-center justify-center">
+                              <Music className="h-10 w-10 sm:h-12 sm:w-12 text-primary/40" />
+                            </div>
+                          )}
+                          
+                          {/* Play overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="spotify" size="icon" className="h-10 w-10 sm:h-12 sm:w-12 shadow-lg">
+                              <Play className="h-5 w-5 sm:h-6 sm:w-6 ml-0.5" fill="currentColor" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Artist name */}
+                        <h3 className="font-semibold text-xs sm:text-sm text-center truncate px-1">
+                          {artist.name}
+                        </h3>
+                        
+                        {/* Genre or bio (optional) */}
+                        {artist.genre && (
+                          <p className="text-[10px] sm:text-xs text-muted-foreground text-center truncate px-1">
+                            {artist.genre}
+                          </p>
+                        )}
+                      </motion.div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
           </section>
         )}
 

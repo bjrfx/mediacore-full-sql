@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import MiniPlayer from './MiniPlayer';
@@ -11,14 +11,6 @@ import { cn } from '../../lib/utils';
 export default function MainLayout() {
   const { isMiniPlayerVisible } = usePlayerStore();
   const location = useLocation();
-  const mainRef = useRef(null);
-
-  // Scroll to top when route changes
-  useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTo(0, 0);
-    }
-  }, [location.pathname]);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -36,28 +28,30 @@ export default function MainLayout() {
 
         {/* Page content */}
         <main
-          ref={mainRef}
           className={cn(
             'flex-1 overflow-auto',
             // Desktop: padding for mini-player
-            isMiniPlayerVisible && 'md:pb-24',
+            'md:pb-24',
             // Mobile: padding for bottom nav + mini-player
             isMiniPlayerVisible ? 'pb-32' : 'pb-16'
           )}
         >
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.2 }}
-            className={cn(
-              'min-h-full',
-              // Responsive padding: mobile gets less, desktop gets more
-              'p-4 sm:p-6 md:p-6'
-            )}
-          >
-            <Outlet />
-          </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className={cn(
+                'min-h-full',
+                // Responsive padding: mobile gets less, desktop gets more
+                'p-4 sm:p-6 md:p-6'
+              )}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
