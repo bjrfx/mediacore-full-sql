@@ -227,12 +227,34 @@ export default function Home() {
             <div className="w-full min-w-0 relative">
               <div className="aspect-square sm:aspect-video md:aspect-[3/1] lg:aspect-[4/1] w-full">
                 
-                {/* Background image */}
-                <ThumbnailFallback
-                  id={featuredItem.id}
-                  isVideo={featuredItem.type === 'video'}
-                  size="large"
-                />
+                {/* Background image - thumbnail on mobile, fallback on larger screens */}
+                {featuredItem.thumbnail ? (
+                  <>
+                    {/* Mobile: show actual thumbnail */}
+                    <img
+                      src={featuredItem.thumbnail}
+                      alt={featuredItem.title}
+                      className="block sm:hidden w-full h-full object-cover"
+                    />
+                    {/* Tablet/Desktop: show gradient fallback */}
+                    <div className="hidden sm:block w-full h-full">
+                      <ThumbnailFallback
+                        title={featuredItem.title}
+                        id={featuredItem.id}
+                        isVideo={featuredItem.type === 'video'}
+                        size="large"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  /* Fallback for items without thumbnails */
+                  <ThumbnailFallback
+                    title={featuredItem.title}
+                    id={featuredItem.id}
+                    isVideo={featuredItem.type === 'video'}
+                    size="large"
+                  />
+                )}
 
                 {/* Gradient overlays for text readability */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
