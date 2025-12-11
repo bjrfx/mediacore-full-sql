@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Chrome, Headphones, Clock, Languages, ArrowRight, X } from 'lucide-react';
+import { User, Mail, LogIn, Headphones, Clock, Languages, ArrowRight, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Button } from '../ui/button';
 import { cn } from '../../lib/utils';
 import useSubscriptionStore from '../../store/subscriptionStore';
 import usePlayerStore from '../../store/playerStore';
+import { useUIStore } from '../../store';
 
 /**
  * Login Prompt Modal
@@ -20,6 +21,7 @@ import usePlayerStore from '../../store/playerStore';
 export default function LoginPromptModal({ open, onOpenChange }) {
   const { closeModal, isPlaybackBlocked } = useSubscriptionStore();
   const { closeMiniPlayer } = usePlayerStore();
+  const { openModal } = useUIStore();
 
   const handleClose = () => {
     // If playback is blocked, close the player too
@@ -32,15 +34,15 @@ export default function LoginPromptModal({ open, onOpenChange }) {
 
   const handleLogin = () => {
     handleClose();
-    // Trigger global login modal
-    window.dispatchEvent(new Event('show-login-modal'));
+    // Open login modal
+    openModal('login');
   };
 
   const handleSignUp = () => {
     handleClose();
-    // Trigger global login modal in sign-up mode
+    // Trigger sign-up mode and open login modal
     window.dispatchEvent(new Event('show-signup-modal'));
-    window.dispatchEvent(new Event('show-login-modal'));
+    openModal('login');
   };
 
   const benefits = [
@@ -114,8 +116,8 @@ export default function LoginPromptModal({ open, onOpenChange }) {
             onClick={handleLogin}
             className="w-full"
           >
-            <Chrome className="h-4 w-4 mr-2" />
-            Sign In with Google
+            <LogIn className="h-4 w-4 mr-2" />
+            Log In
           </Button>
         </div>
 
