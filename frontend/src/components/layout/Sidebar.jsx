@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,6 +42,11 @@ function Sidebar() {
   const { isAdminUser, user } = useAuthStore();
   const { playlists } = useLibraryStore();
   const location = useLocation();
+
+  // Set sidebar collapsed by default on mount
+  useEffect(() => {
+    setSidebarCollapsed(true);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   const sidebarVariants = {
     expanded: { width: 280 },
@@ -192,7 +197,7 @@ function Sidebar() {
       )}
 
       {/* Settings at bottom */}
-      <div className="mt-auto px-2 py-4 space-y-1">
+      {/* <div className="mt-auto px-2 py-4 space-y-1">
         <NavItem
           item={{ icon: User, label: 'Profile', path: '/profile' }}
           collapsed={collapsed}
@@ -201,11 +206,11 @@ function Sidebar() {
           item={{ icon: Settings, label: 'Settings', path: '/settings' }}
           collapsed={collapsed}
         />
-      </div>
+      </div> */}
 
       {/* Collapse button (desktop only) */}
       {!isMobile && (
-        <div className="px-2 pb-4">
+        <div className="px-2 pb-4 mt-5">
           <Button
             variant="ghost"
             size={collapsed ? 'icon' : 'default'}
