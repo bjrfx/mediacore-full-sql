@@ -116,7 +116,7 @@ export function generateGradient(seed) {
 
 // Get initials from title for fallback thumbnail
 export function getTitleInitials(title, maxChars = 2) {
-  if (!title) return '?';
+  if (!title) return '';
   
   const words = title.trim().split(/\s+/);
   if (words.length === 1) {
