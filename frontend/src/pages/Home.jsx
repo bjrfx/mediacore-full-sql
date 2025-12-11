@@ -247,7 +247,7 @@ export default function Home() {
                     {/* Tablet/Desktop: show gradient fallback */}
                     <div className="hidden sm:block w-full h-full">
                       <ThumbnailFallback
-                        title={featuredItem.title}
+                        // title={featuredItem.title}
                         id={featuredItem.id}
                         isVideo={featuredItem.type === 'video'}
                         size="large"
