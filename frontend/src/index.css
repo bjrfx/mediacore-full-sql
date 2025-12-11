@@ -106,6 +106,114 @@
     @apply opacity-100;
   }
 
+  /* ========== NEW RESPONSIVE DESIGN STYLES ========== */
+  
+  /* Responsive Media Cards */
+  .responsive-media-card {
+    @apply w-full min-w-0 flex flex-col cursor-pointer group transition-all duration-200;
+  }
+
+  .responsive-media-card-image {
+    @apply w-full min-w-0 relative rounded-xl overflow-hidden mb-3 sm:mb-4 shadow-md hover:shadow-xl transition-shadow duration-300;
+  }
+
+  .responsive-media-card-image img {
+    @apply w-full h-full object-cover group-hover:scale-110 transition-transform duration-300;
+  }
+
+  /* Gradient overlay on card images */
+  .card-gradient-overlay {
+    @apply absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300;
+  }
+
+  /* Card title styling */
+  .card-title {
+    @apply font-semibold text-sm leading-tight line-clamp-2 w-full min-w-0 break-words;
+  }
+
+  .card-subtitle {
+    @apply text-xs text-muted-foreground line-clamp-1 w-full min-w-0 mt-1;
+  }
+
+  /* Responsive Grid */
+  .responsive-grid {
+    @apply w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 auto-rows-max;
+  }
+
+  /* Hero section */
+  .hero-section {
+    @apply relative w-full overflow-hidden rounded-2xl shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer group;
+  }
+
+  .hero-container {
+    @apply w-full min-w-0 relative;
+  }
+
+  .hero-gradient-dark {
+    @apply absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent;
+  }
+
+  .hero-gradient-light {
+    @apply absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent;
+  }
+
+  /* Text truncation utilities */
+  .text-truncate-1 {
+    @apply truncate;
+  }
+
+  .text-truncate-2 {
+    @apply line-clamp-2;
+  }
+
+  .text-truncate-3 {
+    @apply line-clamp-3;
+  }
+
+  /* Min-width zero for flex children */
+  .flex-no-overflow {
+    @apply min-w-0;
+  }
+
+  /* Skeleton loading animations */
+  .skeleton-shimmer {
+    @apply animate-pulse bg-gradient-to-r from-secondary via-secondary/50 to-secondary;
+  }
+
+  /* Badge styling */
+  .badge-video {
+    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm bg-blue-500/90 text-white;
+  }
+
+  .badge-audio {
+    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm bg-green-500/90 text-white;
+  }
+
+  /* Responsive padding utilities */
+  .px-responsive {
+    @apply px-4 sm:px-6 md:px-8;
+  }
+
+  .py-responsive {
+    @apply py-4 sm:py-6 md:py-8;
+  }
+
+  /* Safe area support */
+  .safe-area-top {
+    @apply pt-4 sm:pt-6;
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    @apply pb-4 sm:pb-6;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* Touch targets for mobile */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
   .sidebar-item {
     @apply flex items-center gap-4 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer;
   }
