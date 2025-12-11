@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Play, TrendingUp, RotateCcw, Video, Music, Upload, Globe, Sparkles, ChevronRight } from 'lucide-react';
@@ -119,13 +119,49 @@ export default function Home() {
     return 'Good evening';
   };
 
-  // Featured/Hero section with first item
-  const featuredItem = allMedia[0];
+
+  // Carousel: select up to 5 featured items (could be improved to use a 'featured' flag)
+  const featuredItems = allMedia.slice(0, 5);
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const featuredItem = featuredItems[featuredIndex];
+
+  // Auto-scroll carousel
+  const autoScrollRef = useRef();
+  useEffect(() => {
+    if (featuredItems.length <= 1) return;
+    // Clear any previous interval
+    if (autoScrollRef.current) clearInterval(autoScrollRef.current);
+    autoScrollRef.current = setInterval(() => {
+      setFeaturedIndex((prev) => (prev === featuredItems.length - 1 ? 0 : prev + 1));
+    }, 5000); // 5 seconds
+    return () => clearInterval(autoScrollRef.current);
+  }, [featuredItems.length]);
+
+  // Reset auto-scroll on manual navigation
+  const resetAutoScroll = () => {
+    if (autoScrollRef.current) {
+      clearInterval(autoScrollRef.current);
+      autoScrollRef.current = setInterval(() => {
+        setFeaturedIndex((prev) => (prev === featuredItems.length - 1 ? 0 : prev + 1));
+      }, 5000);
+    }
+  };
 
   const handlePlayAll = () => {
-    if (allMedia.length > 0) {
-      playTrack(allMedia[0], allMedia);
+    if (featuredItems.length > 0) {
+      playTrack(featuredItems[featuredIndex], featuredItems);
     }
+  };
+
+  const handlePrev = (e) => {
+    e.stopPropagation();
+    setFeaturedIndex((prev) => (prev === 0 ? featuredItems.length - 1 : prev - 1));
+    resetAutoScroll();
+  };
+  const handleNext = (e) => {
+    e.stopPropagation();
+    setFeaturedIndex((prev) => (prev === featuredItems.length - 1 ? 0 : prev + 1));
+    resetAutoScroll();
   };
 
   // Handle resume play
@@ -152,16 +188,37 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Featured Card - Always visible when content exists */}
-      {featuredItem && (
+      {/* Featured Card Carousel - Always visible when content exists */}
+      {featuredItems.length > 0 && (
         <div className="px-4 sm:px-6 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
             className="relative rounded-2xl overflow-hidden shadow-2xl cursor-pointer group"
-            onClick={() => playTrack(featuredItem, allMedia)}
+            onClick={() => playTrack(featuredItem, featuredItems)}
           >
+            {/* Carousel Controls */}
+            {featuredItems.length > 1 && (
+              <>
+                <button
+                  aria-label="Previous featured"
+                  onClick={handlePrev}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 shadow-lg"
+                  style={{ backdropFilter: 'blur(4px)' }}
+                >
+                  <ChevronRight className="h-6 w-6 rotate-180" />
+                </button>
+                <button
+                  aria-label="Next featured"
+                  onClick={handleNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/70 text-white rounded-full p-2 shadow-lg"
+                  style={{ backdropFilter: 'blur(4px)' }}
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              </>
+            )}
             {/* Background - Always use ThumbnailFallback for featured card */}
             <div className="aspect-[1.5/1] sm:aspect-[2/1] md:aspect-[3/1] lg:aspect-[4/1] relative">
               <ThumbnailFallback
@@ -169,7 +226,6 @@ export default function Home() {
                 isVideo={featuredItem.type === 'video'}
                 size="large"
               />
-              
               {/* Gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -227,7 +283,6 @@ export default function Home() {
                   <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" fill="currentColor" />
                   Play All
                 </Button>
-                
                 {/* Media type badge */}
                 <span className={cn(
                   'px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-xs font-medium backdrop-blur-sm',
@@ -239,6 +294,26 @@ export default function Home() {
                 </span>
               </motion.div>
             </div>
+            {/* Carousel Dots */}
+            {featuredItems.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                {featuredItems.map((_, idx) => (
+                  <button
+                    key={idx}
+                    aria-label={`Go to featured ${idx + 1}`}
+                    className={cn(
+                      'w-2.5 h-2.5 rounded-full',
+                      idx === featuredIndex ? 'bg-primary' : 'bg-white/40'
+                    )}
+                    onClick={e => {
+                      e.stopPropagation();
+                      setFeaturedIndex(idx);
+                      resetAutoScroll();
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </motion.div>
         </div>
       )}
