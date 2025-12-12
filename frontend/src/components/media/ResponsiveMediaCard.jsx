@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, MoreHorizontal, Heart, ListPlus, Download, Trash2 } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, getLanguageName } from '../../lib/utils';
 import usePlayerStore from '../../store/playerStore';
 import useLibraryStore from '../../store/libraryStore';
 import useUIStore from '../../store/uiStore';
@@ -123,16 +123,21 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
             </div>
 
             {/* Type badge - top left */}
-            <div className="absolute top-2 left-2">
+            <div className="absolute top-2 left-2 flex flex-col gap-1">
               <span
                 className={cn(
-                  'px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm',
+                  'px-2 py-1 rounded-md text-xs font-bold backdrop-blur-md',
                   isVideo
-                    ? 'bg-blue-500/90 text-white'
-                    : 'bg-green-500/90 text-white'
+                    ? 'bg-blue-500/40 text-blue-100'
+                    : 'bg-green-500/40 text-green-100'
                 )}
               >
                 {isVideo ? '🎬 VIDEO' : '🎵 AUDIO'}
+              </span>
+              
+              {/* Language badge */}
+              <span className="px-2 py-1 rounded-md text-xs font-bold backdrop-blur-md bg-purple-500/40 text-purple-100 flex items-center gap-1">
+                🌐 {getLanguageName(media.language || 'en')}
               </span>
             </div>
 

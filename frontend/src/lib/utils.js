@@ -176,6 +176,55 @@ export function isKeyboardShortcut(event, key, modifiers = {}) {
   );
 }
 
+// Language code to language name mapping
+const LANGUAGE_NAMES = {
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'it': 'Italian',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'ja': 'Japanese',
+  'zh': 'Chinese',
+  'ko': 'Korean',
+  'ar': 'Arabic',
+  'hi': 'Hindi',
+  'bn': 'Bengali',
+  'pa': 'Punjabi',
+  'te': 'తెలుగు',
+  'mr': 'Marathi',
+  'gu': 'Gujarati',
+  'ta': 'Tamil',
+  'ur': 'Urdu',
+  'pl': 'Polish',
+  'uk': 'Ukrainian',
+  'ro': 'Romanian',
+  'nl': 'Dutch',
+  'sv': 'Swedish',
+  'tr': 'Turkish',
+  'th': 'Thai',
+  'vi': 'Vietnamese',
+  'id': 'Indonesian',
+  'ms': 'Malay',
+  'fil': 'Filipino',
+  'el': 'Greek',
+  'cs': 'Czech',
+  'hu': 'Hungarian',
+};
+
+export function getLanguageName(code) {
+  return LANGUAGE_NAMES[code?.toLowerCase()] || code?.toUpperCase() || 'Unknown';
+}
+
+// Get language code display format (e.g., 'en' -> 'En', 'te' -> 'Te')
+export function getLanguageCode(code) {
+  if (!code) return 'En';
+  return code.length === 2 
+    ? code.charAt(0).toUpperCase() + code.charAt(1) 
+    : code.substring(0, 2).toUpperCase();
+}
+
 // Local storage helpers with error handling
 export const storage = {
   get: (key, defaultValue = null) => {

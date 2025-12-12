@@ -100,10 +100,10 @@ export default function MediaListItem({ media, queue = [], index = 0, showIndex 
       {/* Type badge */}
       <span
         className={cn(
-          'px-2 py-0.5 rounded text-xs font-medium hidden sm:block',
+          'px-2 py-0.5 rounded text-xs font-medium hidden sm:block backdrop-blur-md',
           isVideo
-            ? 'bg-blue-500/20 text-blue-400'
-            : 'bg-green-500/20 text-green-400'
+            ? 'bg-blue-500/40 text-blue-100'
+            : 'bg-green-500/40 text-green-100'
         )}
       >
         {isVideo ? 'VIDEO' : 'AUDIO'}

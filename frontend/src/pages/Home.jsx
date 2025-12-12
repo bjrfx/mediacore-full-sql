@@ -7,7 +7,7 @@ import { publicApi } from '../services/api';
 import { usePlayerStore, useAuthStore } from '../store';
 import { ResponsiveMediaGrid, LanguageCardGrid, CompactLanguageBadges, ThumbnailFallback } from '../components/media';
 import { Button } from '../components/ui/button';
-import { cn, formatDuration } from '../lib/utils';
+import { cn, formatDuration, getLanguageName } from '../lib/utils';
 
 /**
  * HOME PAGE REDESIGN - Mobile-First Responsive Layout
@@ -354,10 +354,15 @@ export default function Home() {
                   <span className={cn(
                     'px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md flex-shrink-0',
                     featuredItem.type === 'video' 
-                      ? 'bg-blue-500/40 text-blue-200' 
-                      : 'bg-green-500/40 text-green-200'
+                      ? 'bg-blue-500/40 text-blue-100' 
+                      : 'bg-green-500/40 text-green-100'
                   )}>
                     {featuredItem.type === 'video' ? '🎬' : '🎵'}
+                  </span>
+
+                  {/* Language badge */}
+                  <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md bg-purple-500/40 text-purple-100 flex-shrink-0 flex items-center gap-1">
+                    🌐 {getLanguageName(featuredItem.language || 'en')}
                   </span>
                 </motion.div>
               </div>
@@ -426,6 +431,23 @@ export default function Home() {
                       size="medium"
                     />
                   )}
+                  
+                  {/* Type badge */}
+                  <div className="absolute top-2 left-2 flex flex-col gap-1">
+                    <span className={cn(
+                      'px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 backdrop-blur-md',
+                      item.type === 'video' 
+                        ? 'bg-blue-500/40 text-blue-100' 
+                        : 'bg-green-500/40 text-green-100'
+                    )}>
+                      {item.type === 'video' ? '🎬' : '🎵'} {item.type.toUpperCase()}
+                    </span>
+                    
+                    {/* Language badge */}
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/40 text-purple-100 flex items-center gap-1 backdrop-blur-md">
+                      🌐 {getLanguageName(item.language || 'en')}
+                    </span>
+                  </div>
                   
                   {/* Progress bar */}
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/40">
