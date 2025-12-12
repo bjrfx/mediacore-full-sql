@@ -8,13 +8,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105",
+        default: "bg-primary text-primary-foreground hover:bg-[#16A34A] hover:scale-105 disabled:bg-[#1F2937] disabled:text-[#6B7280] disabled:hover:scale-100",
         destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        outline: "border border-[#374151] bg-transparent text-[#E5E7EB] hover:bg-[#161E2E]",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+        ghost: "text-[#9CA3AF] hover:bg-[#161E2E] hover:text-[#E5E7EB]",
         link: "text-primary underline-offset-4 hover:underline",
-        spotify: "bg-spotify-green text-white hover:bg-spotify-green/90 hover:scale-105 rounded-full",
+        spotify: "bg-primary text-primary-foreground hover:bg-[#16A34A] hover:scale-105 rounded-full disabled:bg-[#1F2937] disabled:text-[#6B7280] disabled:hover:scale-100",
       },
       size: {
         default: "h-10 px-4 py-2",

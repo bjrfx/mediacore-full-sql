@@ -23,11 +23,11 @@ export const TIER_DISPLAY_NAMES = {
 
 // Subscription tier colors for badges
 export const TIER_COLORS = {
-  [SUBSCRIPTION_TIERS.GUEST]: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
-  [SUBSCRIPTION_TIERS.FREE]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  [SUBSCRIPTION_TIERS.PREMIUM]: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  [SUBSCRIPTION_TIERS.GUEST]: 'text-[#9CA3AF] border-[#9CA3AF]/30',
+  [SUBSCRIPTION_TIERS.FREE]: 'text-[#6366F1] border-[#6366F1]/30',
+  [SUBSCRIPTION_TIERS.PREMIUM]: 'text-[#8B5CF6] border-[#8B5CF6]/30',
   [SUBSCRIPTION_TIERS.PREMIUM_PLUS]: 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-500/30',
-  [SUBSCRIPTION_TIERS.ENTERPRISE]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  [SUBSCRIPTION_TIERS.ENTERPRISE]: 'text-[#22C55E] border-[#22C55E]/30',
 };
 
 // Playback limits in seconds

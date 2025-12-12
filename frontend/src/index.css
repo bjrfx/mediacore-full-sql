@@ -2,27 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * ==========================================
+ * MEDIACORE VISUAL SYSTEM
+ * Calm, Spiritual, Premium Dark Theme
+ * ==========================================
+ * 
+ * COLOR PALETTE:
+ * - Background: #0B0F14 (App), #111827 (Cards), #161E2E (Hover)
+ * - Text: #F9FAFB (Headings), #FFFFFF (Titles), #9CA3AF (Secondary), #6B7280 (Muted)
+ * - Accents: #22C55E (Primary/Active), #8B5CF6 (Spiritual Purple), #6366F1 (Highlight Indigo)
+ * 
+ * GLASSMORPHISM (LIMITED):
+ * - Hero carousel overlay
+ * - Modals and dialogs
+ * - Dropdown menus
+ * - Floating player (if present)
+ * 
+ * NOT applied to: Sidebar, Content cards, Lists, Text areas
+ */
+
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 141 76% 42%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 64%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 141 76% 42%;
+    /* MediaCore Premium Dark Theme */
+    /* Backgrounds */
+    --background: 217 33% 6%;        /* #0B0F14 */
+    --foreground: 210 20% 98%;        /* #F9FAFB */
+    --card: 217 33% 11%;              /* #111827 */
+    --card-foreground: 0 0% 100%;     /* #FFFFFF */
+    --popover: 217 33% 11%;           /* #111827 */
+    --popover-foreground: 210 20% 98%; /* #F9FAFB */
+    
+    /* Primary - Green accent */
+    --primary: 142 71% 45%;           /* #22C55E */
+    --primary-foreground: 217 33% 6%; /* #0B0F14 */
+    
+    /* Secondary - Card hover state */
+    --secondary: 217 35% 14%;         /* #161E2E */
+    --secondary-foreground: 0 0% 100%; /* #FFFFFF */
+    
+    /* Muted - Secondary text and disabled states */
+    --muted: 215 14% 34%;             /* #6B7280 */
+    --muted-foreground: 220 9% 46%;   /* #9CA3AF */
+    
+    /* Accent - Spiritual purple */
+    --accent: 258 90% 66%;            /* #8B5CF6 */
+    --accent-foreground: 0 0% 100%;   /* #FFFFFF */
+    
+    /* Destructive */
+    --destructive: 0 84% 60%;         /* Keep as is */
+    --destructive-foreground: 0 0% 98%; /* #F9FAFB */
+    
+    /* Borders */
+    --border: 215 25% 27%;            /* #374151 */
+    --input: 215 25% 27%;             /* #374151 */
+    --ring: 142 71% 45%;              /* #22C55E */
+    
     --radius: 0.75rem;
   }
 }
@@ -33,7 +68,8 @@
   }
   
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply text-foreground font-sans antialiased;
+    background-color: #0B0F14;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   }
 
@@ -70,7 +106,17 @@
 
 @layer components {
   .glass-effect {
-    @apply bg-black/40 backdrop-blur-xl border border-white/10;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  .glass-modal {
+    background: rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .gradient-mask {
@@ -182,11 +228,21 @@
 
   /* Badge styling */
   .badge-video {
-    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm bg-blue-500/90 text-white;
+    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm;
+    background: rgba(99, 102, 241, 0.15);
+    color: #6366F1;
   }
 
   .badge-audio {
-    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm bg-green-500/90 text-white;
+    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm;
+    background: rgba(34, 197, 94, 0.15);
+    color: #22C55E;
+  }
+  
+  .badge-language {
+    @apply px-2 py-1 rounded-md text-xs font-bold backdrop-blur-sm;
+    background: rgba(139, 92, 246, 0.2);
+    color: #EDE9FE;
   }
 
   /* Responsive padding utilities */
@@ -215,15 +271,24 @@
   }
 
   .sidebar-item {
-    @apply flex items-center gap-4 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-all duration-200 cursor-pointer;
+    @apply flex items-center gap-4 px-4 py-3 rounded-lg transition-all duration-200 cursor-pointer;
+    color: #D1D5DB;
+  }
+  
+  .sidebar-item:hover {
+    color: #E5E7EB;
+    background-color: #161E2E;
   }
 
   .sidebar-item.active {
-    @apply text-foreground bg-secondary;
+    color: #22C55E;
+    background-color: #161E2E;
   }
 
   .mini-player {
-    @apply fixed bottom-0 left-0 right-0 h-20 bg-gradient-to-r from-[#181818] to-[#282828] border-t border-border z-50;
+    @apply fixed bottom-0 left-0 right-0 h-20 border-t z-50;
+    background: linear-gradient(to right, #111827, #161E2E);
+    border-color: #374151;
   }
 
   .progress-bar {
@@ -231,7 +296,12 @@
   }
 
   .progress-bar-fill {
-    @apply h-full bg-primary transition-all duration-100 group-hover:bg-green-400;
+    @apply h-full transition-all duration-100;
+    background-color: #22C55E;
+  }
+  
+  .progress-bar:hover .progress-bar-fill {
+    background-color: #16A34A;
   }
 
   .volume-slider {
@@ -239,19 +309,46 @@
   }
 
   .input-search {
-    @apply w-full bg-secondary border-none rounded-full px-6 py-3 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary;
+    @apply w-full rounded-full px-6 py-3 placeholder:text-muted-foreground focus:outline-none focus:ring-2;
+    background-color: #161E2E;
+    border: 1px solid #374151;
+    color: #F9FAFB;
+  }
+  
+  .input-search:focus {
+    border-color: #22C55E;
+    ring-color: #22C55E;
   }
 
   .btn-primary {
-    @apply bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold hover:scale-105 hover:brightness-110 transition-all duration-200;
+    @apply px-6 py-2 rounded-full font-semibold transition-all duration-200;
+    background-color: #22C55E;
+    color: #0B0F14;
+  }
+  
+  .btn-primary:hover {
+    background-color: #16A34A;
+    transform: scale(1.05);
   }
 
   .btn-secondary {
-    @apply bg-secondary text-foreground px-6 py-2 rounded-full font-semibold hover:bg-accent transition-all duration-200;
+    @apply px-6 py-2 rounded-full font-semibold transition-all duration-200;
+    background-color: transparent;
+    border: 1px solid #374151;
+    color: #E5E7EB;
+  }
+  
+  .btn-secondary:hover {
+    background-color: #161E2E;
   }
 
   .btn-ghost {
-    @apply text-muted-foreground hover:text-foreground transition-colors duration-200;
+    @apply transition-colors duration-200;
+    color: #9CA3AF;
+  }
+  
+  .btn-ghost:hover {
+    color: #E5E7EB;
   }
 
   .card-hover {

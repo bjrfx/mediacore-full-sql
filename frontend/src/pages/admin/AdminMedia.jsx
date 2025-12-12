@@ -344,7 +344,7 @@ export default function AdminMedia() {
                         {media.type}
                       </Badge>
                       {media.isHls && (
-                        <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                        <Badge variant="outline" className="text-[#22C55E] border-[#22C55E]/20" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
                           HLS
                         </Badge>
                       )}
@@ -458,7 +458,7 @@ export default function AdminMedia() {
                     {media.type}
                   </Badge>
                   {media.isHls && (
-                    <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                    <Badge variant="outline" className="text-[#22C55E] border-[#22C55E]/20" style={{ background: 'rgba(34, 197, 94, 0.1)' }}>
                       HLS
                     </Badge>
                   )}

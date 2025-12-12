@@ -48,7 +48,47 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Spotify-inspired colors
+        // MediaCore Premium Dark Theme Colors
+        mediacore: {
+          // Backgrounds
+          'bg-app': '#0B0F14',
+          'bg-card': '#111827',
+          'bg-card-hover': '#161E2E',
+          'bg-sidebar': '#0B0F14',
+          
+          // Text colors
+          'text-heading': '#F9FAFB',
+          'text-title': '#FFFFFF',
+          'text-secondary': '#9CA3AF',
+          'text-muted': '#6B7280',
+          'text-disabled': '#6B7280',
+          
+          // Accent colors
+          'accent-primary': '#22C55E',
+          'accent-primary-hover': '#16A34A',
+          'accent-spiritual': '#8B5CF6',
+          'accent-highlight': '#6366F1',
+          
+          // Button colors
+          'btn-primary-bg': '#22C55E',
+          'btn-primary-text': '#0B0F14',
+          'btn-primary-hover': '#16A34A',
+          'btn-secondary-border': '#374151',
+          'btn-secondary-text': '#E5E7EB',
+          'btn-disabled-bg': '#1F2937',
+          'btn-disabled-text': '#6B7280',
+          
+          // Icon colors
+          'icon-default': '#9CA3AF',
+          'icon-hover': '#E5E7EB',
+          'icon-active': '#22C55E',
+          
+          // Sidebar colors
+          'sidebar-item': '#D1D5DB',
+          'sidebar-hover': '#E5E7EB',
+          'sidebar-active': '#22C55E',
+        },
+        // Spotify-inspired colors (legacy support)
         spotify: {
           green: "#1DB954",
           black: "#191414",
@@ -88,8 +128,8 @@ module.exports = {
           to: { transform: "scale(1)", opacity: 1 },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(29, 185, 84, 0.4)" },
-          "50%": { boxShadow: "0 0 40px rgba(29, 185, 84, 0.8)" },
+          "0%, 100%": { boxShadow: "0 0 20px rgba(34, 197, 94, 0.4)" },
+          "50%": { boxShadow: "0 0 40px rgba(34, 197, 94, 0.8)" },
         },
       },
       animation: {
@@ -103,7 +143,7 @@ module.exports = {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-spotify': 'linear-gradient(180deg, rgba(29,185,84,0.3) 0%, rgba(18,18,18,1) 100%)',
+        'gradient-spotify': 'linear-gradient(180deg, rgba(34,197,94,0.3) 0%, rgba(11,15,20,1) 100%)',
       },
     },
   },

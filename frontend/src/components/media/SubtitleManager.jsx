@@ -204,13 +204,26 @@ export default function SubtitleManager({
   const getFormatColor = (format) => {
     switch (format) {
       case 'srt':
-        return 'bg-blue-500/20 text-blue-400';
+        return 'text-[#6366F1]';
       case 'vtt':
-        return 'bg-green-500/20 text-green-400';
+        return 'text-[#22C55E]';
       case 'txt':
-        return 'bg-orange-500/20 text-orange-400';
+        return 'text-orange-400';
       default:
-        return 'bg-gray-500/20 text-gray-400';
+        return 'text-[#9CA3AF]';
+    }
+  };
+  
+  const getFormatBg = (format) => {
+    switch (format) {
+      case 'srt':
+        return 'rgba(99, 102, 241, 0.15)';
+      case 'vtt':
+        return 'rgba(34, 197, 94, 0.15)';
+      case 'txt':
+        return 'rgba(251, 146, 60, 0.15)';
+      default:
+        return 'rgba(156, 163, 175, 0.15)';
     }
   };
 
@@ -323,7 +336,7 @@ export default function SubtitleManager({
                     )}
                   </div>
 
-                  <Badge className={cn('flex-shrink-0', getFormatColor(sub.format))}>
+                  <Badge className={cn('flex-shrink-0', getFormatColor(sub.format))} style={{ background: getFormatBg(sub.format) }}>
                     {sub.format.toUpperCase()}
                   </Badge>
 

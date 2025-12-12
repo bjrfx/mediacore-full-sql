@@ -114,15 +114,22 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
             className={cn(
               'px-2 py-0.5 rounded text-xs font-medium backdrop-blur-md',
               isVideo
-                ? 'bg-blue-500/40 text-blue-100'
-                : 'bg-green-500/40 text-green-100'
+                ? 'text-[#6366F1]'
+                : 'text-[#22C55E]'
             )}
+            style={isVideo 
+              ? { background: 'rgba(99, 102, 241, 0.15)' }
+              : { background: 'rgba(34, 197, 94, 0.15)' }
+            }
           >
             {isVideo ? 'VIDEO' : 'AUDIO'}
           </span>
           
           {/* Language badge */}
-          <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/40 text-purple-100 flex items-center gap-1 backdrop-blur-md">
+          <span 
+            className="px-2 py-0.5 rounded text-xs font-medium text-[#EDE9FE] flex items-center gap-1 backdrop-blur-md"
+            style={{ background: 'rgba(139, 92, 246, 0.2)' }}
+          >
             {getLanguageName(media.language || 'en')}
           </span>
         </div>

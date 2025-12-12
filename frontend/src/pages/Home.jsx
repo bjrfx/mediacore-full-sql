@@ -296,75 +296,86 @@ export default function Home() {
                 </>
               )}
 
-              {/* Content - positioned at bottom */}
+              {/* Content - positioned at bottom with glass overlay */}
               <div className="absolute inset-0 flex flex-col justify-end p-3 sm:p-4 md:p-6 lg:p-8">
                 
-                {/* Featured badge */}
-                <motion.span 
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2, duration: 0.3 }}
-                  className="inline-flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm font-bold text-primary bg-primary/25 backdrop-blur-md px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 rounded-full w-fit mb-2 sm:mb-3 md:mb-4"
-                >
-                  <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
-                  FEATURED
-                </motion.span>
-
-                {/* Title - proper truncation on mobile */}
-                <motion.h2 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25, duration: 0.3 }}
-                  className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-2 md:mb-3 line-clamp-2 min-w-0"
-                >
-                  {featuredItem.title}
-                </motion.h2>
-
-                {/* Subtitle/Artist - hidden on very small screens */}
-                <motion.p 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.3 }}
-                  className="text-white/80 text-xs sm:text-sm md:text-base mb-3 sm:mb-4 md:mb-6 line-clamp-1 min-w-0 hidden sm:block"
-                >
-                  {featuredItem.artistName || featuredItem.subtitle || 'Start exploring amazing content'}
-                </motion.p>
-
-                {/* Action buttons */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35, duration: 0.3 }}
-                  className="flex items-center gap-2 sm:gap-3 flex-wrap"
-                >
-                  <Button 
-                    variant="spotify" 
-                    size="sm"
-                    className="shadow-lg h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayAll();
-                    }}
+                {/* Glass overlay container for content */}
+                <div className="glass-effect rounded-2xl p-4 sm:p-5 md:p-6">
+                  {/* Featured badge */}
+                  <motion.span 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.2, duration: 0.3 }}
+                    className="inline-flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm font-bold text-primary px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 rounded-full w-fit mb-2 sm:mb-3 md:mb-4"
+                    style={{ background: 'rgba(34, 197, 94, 0.2)' }}
                   >
-                    <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" fill="currentColor" />
-                    <span className="truncate">Play</span>
-                  </Button>
+                    <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
+                    FEATURED
+                  </motion.span>
 
-                  {/* Type badge */}
-                  <span className={cn(
-                    'px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md flex-shrink-0',
-                    featuredItem.type === 'video' 
-                      ? 'bg-blue-500/40 text-blue-100' 
-                      : 'bg-green-500/40 text-green-100'
-                  )}>
-                    {featuredItem.type === 'video' ? '🎬' : '🎵'}
-                  </span>
+                  {/* Title - proper truncation on mobile */}
+                  <motion.h2 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.25, duration: 0.3 }}
+                    className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-2 md:mb-3 line-clamp-2 min-w-0"
+                  >
+                    {featuredItem.title}
+                  </motion.h2>
 
-                  {/* Language badge */}
-                  <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md bg-purple-500/40 text-purple-100 flex-shrink-0 flex items-center gap-1">
-                    🌐 {getLanguageName(featuredItem.language || 'en')}
-                  </span>
-                </motion.div>
+                  {/* Subtitle/Artist - hidden on very small screens */}
+                  <motion.p 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.3 }}
+                    className="text-white/80 text-xs sm:text-sm md:text-base mb-3 sm:mb-4 md:mb-6 line-clamp-1 min-w-0 hidden sm:block"
+                  >
+                    {featuredItem.artistName || featuredItem.subtitle || 'Start exploring amazing content'}
+                  </motion.p>
+
+                  {/* Action buttons */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.35, duration: 0.3 }}
+                    className="flex items-center gap-2 sm:gap-3 flex-wrap"
+                  >
+                    <Button 
+                      variant="spotify" 
+                      size="sm"
+                      className="shadow-lg h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayAll();
+                      }}
+                    >
+                      <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" fill="currentColor" />
+                      <span className="truncate">Play</span>
+                    </Button>
+
+                    {/* Type badge */}
+                    <span 
+                      className={cn(
+                        'px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md flex-shrink-0',
+                        featuredItem.type === 'video' ? 'text-[#6366F1]' : 'text-[#22C55E]'
+                      )}
+                      style={featuredItem.type === 'video'
+                        ? { background: 'rgba(99, 102, 241, 0.15)' }
+                        : { background: 'rgba(34, 197, 94, 0.15)' }
+                      }
+                    >
+                      {featuredItem.type === 'video' ? '🎬' : '🎵'}
+                    </span>
+
+                    {/* Language badge */}
+                    <span 
+                      className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md text-[#EDE9FE] flex-shrink-0 flex items-center gap-1"
+                      style={{ background: 'rgba(139, 92, 246, 0.2)' }}
+                    >
+                      🌐 {getLanguageName(featuredItem.language || 'en')}
+                    </span>
+                  </motion.div>
+                </div>
               </div>
 
               {/* Carousel Dots - Bottom center */}
@@ -434,17 +445,24 @@ export default function Home() {
                   
                   {/* Type badge */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1">
-                    <span className={cn(
-                      'px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 backdrop-blur-md',
-                      item.type === 'video' 
-                        ? 'bg-blue-500/40 text-blue-100' 
-                        : 'bg-green-500/40 text-green-100'
-                    )}>
+                    <span 
+                      className={cn(
+                        'px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 backdrop-blur-md',
+                        item.type === 'video' ? 'text-[#6366F1]' : 'text-[#22C55E]'
+                      )}
+                      style={item.type === 'video'
+                        ? { background: 'rgba(99, 102, 241, 0.15)' }
+                        : { background: 'rgba(34, 197, 94, 0.15)' }
+                      }
+                    >
                       {item.type === 'video' ? '🎬' : '🎵'} {item.type.toUpperCase()}
                     </span>
                     
                     {/* Language badge */}
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/40 text-purple-100 flex items-center gap-1 backdrop-blur-md">
+                    <span 
+                      className="px-2 py-0.5 rounded text-[10px] font-semibold text-[#EDE9FE] flex items-center gap-1 backdrop-blur-md"
+                      style={{ background: 'rgba(139, 92, 246, 0.2)' }}
+                    >
                       🌐 {getLanguageName(item.language || 'en')}
                     </span>
                   </div>

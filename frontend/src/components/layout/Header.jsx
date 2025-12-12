@@ -113,7 +113,8 @@ export default function Header() {
             variant="ghost"
             size="icon"
             onClick={() => navigate(-1)}
-            className="rounded-full bg-black/40 hover:bg-black/60"
+            className="rounded-full hover:bg-[#161E2E]"
+            style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
@@ -121,7 +122,8 @@ export default function Header() {
             variant="ghost"
             size="icon"
             onClick={() => navigate(1)}
-            className="rounded-full bg-black/40 hover:bg-black/60"
+            className="rounded-full hover:bg-[#161E2E]"
+            style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
@@ -167,7 +169,8 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="relative flex items-center gap-2 rounded-full bg-black/40 hover:bg-black/60 pr-4"
+                  className="relative flex items-center gap-2 rounded-full pr-4 hover:bg-[#161E2E]"
+                  style={{ backgroundColor: 'rgba(17, 24, 39, 0.8)' }}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user?.photoURL} alt={user?.displayName} />

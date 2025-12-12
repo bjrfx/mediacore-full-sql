@@ -103,7 +103,7 @@ function Sidebar() {
       {/* Logo */}
       <div className={cn('flex items-center gap-3 px-4 py-6', collapsed && 'justify-center px-2')}>
         <img 
-          src="/logo192.svg" 
+          src="/logo192.png" 
           alt="MediaCore" 
           className="w-10 h-10 rounded-lg"
         />
@@ -111,17 +111,14 @@ function Sidebar() {
           <motion.span
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-xl font-bold tracking-tight"
-            style={{ 
-              fontFamily: "'Inter', sans-serif",
-              background: 'linear-gradient(135deg, #1DB954 0%, #1ed760 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              letterSpacing: '-0.02em'
+            className="text-xl font-extrabold tracking-tight transition-all duration-200 hover:brightness-110"
+            style={{
+              fontFamily: "'Poppins', 'Montserrat', 'Inter', 'Segoe UI', 'Arial', sans-serif",
+              letterSpacing: '-0.02em',
             }}
           >
-            MediaCore
+            <span style={{ color: '#E5E7EB' }}>Media</span>
+            <span style={{ color: '#8B5CF6' }}>Core</span>
           </motion.span>
         )}
         {isMobile && (
@@ -239,7 +236,8 @@ function Sidebar() {
         initial={false}
         animate={sidebarCollapsed ? 'collapsed' : 'expanded'}
         transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="hidden lg:flex flex-col bg-black h-full border-r border-border"
+        className="hidden lg:flex flex-col h-full border-r border-border"
+        style={{ backgroundColor: '#0B0F14' }}
       >
         <SidebarContent collapsed={sidebarCollapsed} />
       </motion.aside>
@@ -260,7 +258,8 @@ function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="fixed left-0 top-0 bottom-0 w-[280px] bg-black z-50 lg:hidden"
+              className="fixed left-0 top-0 bottom-0 w-[280px] z-50 lg:hidden"
+              style={{ backgroundColor: '#0B0F14' }}
             >
               <SidebarContent collapsed={false} isMobile />
             </motion.aside>

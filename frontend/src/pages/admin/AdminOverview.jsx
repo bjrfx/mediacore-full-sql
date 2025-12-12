@@ -66,22 +66,22 @@ export default function AdminOverview() {
       title: 'Total Media',
       value: allMedia.length,
       icon: Film,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-[#6366F1]',
+      bgColor: 'rgba(99, 102, 241, 0.1)',
     },
     {
       title: 'Videos',
       value: videoCount,
       icon: Film,
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-500/10',
+      color: 'text-[#8B5CF6]',
+      bgColor: 'rgba(139, 92, 246, 0.1)',
     },
     {
       title: 'Audio',
       value: audioCount,
       icon: Music,
-      color: 'text-green-500',
-      bgColor: 'bg-green-500/10',
+      color: 'text-[#22C55E]',
+      bgColor: 'rgba(34, 197, 94, 0.1)',
     },
     {
       title: 'Active API Keys',
@@ -184,7 +184,7 @@ export default function AdminOverview() {
                   <Line
                     type="monotone"
                     dataKey="count"
-                    stroke="#1DB954"
+                    stroke="#22C55E"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -229,7 +229,7 @@ export default function AdminOverview() {
                       borderRadius: '8px',
                     }}
                   />
-                  <Bar dataKey="count" fill="#1DB954" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="count" fill="#22C55E" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

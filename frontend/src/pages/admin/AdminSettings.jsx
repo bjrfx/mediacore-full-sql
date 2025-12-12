@@ -22,7 +22,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { cn } from '../../lib/utils';
 
 const PRESET_COLORS = [
-  { name: 'Spotify Green', value: '#1DB954' },
+  { name: 'MediaCore Green', value: '#22C55E' },
   { name: 'YouTube Red', value: '#FF0000' },
   { name: 'Apple Blue', value: '#007AFF' },
   { name: 'SoundCloud Orange', value: '#FF5500' },
@@ -37,7 +37,7 @@ export default function AdminSettings() {
   const [savedMessage, setSavedMessage] = useState('');
   const [formData, setFormData] = useState({
     appName: '',
-    primaryColor: '#1DB954',
+    primaryColor: '#22C55E',
     darkMode: true,
   });
   const [hasChanges, setHasChanges] = useState(false);
@@ -50,7 +50,7 @@ export default function AdminSettings() {
       const settings = response.data?.settings || {};
       setFormData({
         appName: settings.appName || 'MediaCore',
-        primaryColor: settings.primaryColor || '#1DB954',
+        primaryColor: settings.primaryColor || '#22C55E',
         darkMode: settings.darkMode !== false,
       });
     },
@@ -82,7 +82,7 @@ export default function AdminSettings() {
   const handleReset = () => {
     setFormData({
       appName: settings.appName || 'MediaCore',
-      primaryColor: settings.primaryColor || '#1DB954',
+      primaryColor: settings.primaryColor || '#22C55E',
       darkMode: settings.darkMode !== false,
     });
     setHasChanges(false);

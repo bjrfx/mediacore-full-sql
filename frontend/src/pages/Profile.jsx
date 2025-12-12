@@ -275,7 +275,7 @@ export default function Profile() {
                     Admin
                   </span>
                 )}
-                <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded-full font-medium flex items-center gap-1">
+                <span className="px-2 py-1 text-[#EDE9FE] text-xs rounded-full font-medium flex items-center gap-1" style={{ background: 'rgba(139, 92, 246, 0.2)' }}>
                   <Flame className="h-3 w-3" />
                   {statsSummary.currentStreak} day streak
                 </span>

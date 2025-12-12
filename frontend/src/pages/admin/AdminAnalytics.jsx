@@ -41,8 +41,8 @@ import {
   Area,
 } from 'recharts';
 
-const COLORS = ['#1DB954', '#1ed760', '#22c55e', '#4ade80', '#86efac', '#bbf7d0'];
-const DONUT_COLORS = ['#1DB954', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const COLORS = ['#22C55E', '#16A34A', '#15803D', '#14532D', '#86EFAC', '#BBF7D0'];
+const DONUT_COLORS = ['#22C55E', '#6366F1', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
 
 // Stat card with trend indicator
 const StatCard = ({ title, value, subtitle, icon: Icon, color, trend, isLoading }) => (
@@ -175,28 +175,32 @@ export default function AdminAnalytics() {
           value={formatNumber(totalRequests)}
           subtitle={`vs last ${days} days`}
           icon={Activity}
-          color="bg-blue-500/10 text-blue-500"
+          color="text-[#6366F1]"
+          style={{ background: 'rgba(99, 102, 241, 0.1)' }}
           isLoading={isLoading}
         />
         <StatCard
           title="Active Keys"
           value={overview.activeApiKeys || apiKeys.length}
           icon={Zap}
-          color="bg-green-500/10 text-green-500"
+          color="text-[#22C55E]"
+          style={{ background: 'rgba(34, 197, 94, 0.1)' }}
           isLoading={isLoading}
         />
         <StatCard
           title="Success Rate"
           value={`${overview.successRate || 100}%`}
           icon={CheckCircle}
-          color="bg-emerald-500/10 text-emerald-500"
+          color="text-[#22C55E]"
+          style={{ background: 'rgba(34, 197, 94, 0.1)' }}
           isLoading={isLoading}
         />
         <StatCard
           title="Total Media"
           value={overview.totalMedia || 0}
           icon={Monitor}
-          color="bg-purple-500/10 text-purple-500"
+          color="text-[#8B5CF6]"
+          style={{ background: 'rgba(139, 92, 246, 0.1)' }}
           isLoading={isLoading}
         />
         <StatCard
@@ -312,8 +316,8 @@ export default function AdminAnalytics() {
                   <Area
                     type="monotone"
                     dataKey="requests"
-                    stroke="#1DB954"
-                    fill="#1DB954"
+                    stroke="#22C55E"
+                    fill="#22C55E"
                     fillOpacity={0.2}
                     strokeWidth={2}
                   />

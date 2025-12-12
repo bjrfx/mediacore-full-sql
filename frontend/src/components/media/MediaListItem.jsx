@@ -101,10 +101,12 @@ export default function MediaListItem({ media, queue = [], index = 0, showIndex 
       <span
         className={cn(
           'px-2 py-0.5 rounded text-xs font-medium hidden sm:block backdrop-blur-md',
-          isVideo
-            ? 'bg-blue-500/40 text-blue-100'
-            : 'bg-green-500/40 text-green-100'
+          isVideo ? 'text-[#6366F1]' : 'text-[#22C55E]'
         )}
+        style={isVideo 
+          ? { background: 'rgba(99, 102, 241, 0.15)' }
+          : { background: 'rgba(34, 197, 94, 0.15)' }
+        }
       >
         {isVideo ? 'VIDEO' : 'AUDIO'}
       </span>
