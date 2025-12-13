@@ -6,9 +6,9 @@ import { cn, getLanguageName, getLanguageCode } from '../../lib/utils';
 
 // Language configurations with colors and gradients
 const LANGUAGE_CONFIG = {
-  en: { name: 'English', nativeName: 'English', color: 'from-blue-500 to-blue-700' },
+  en: { name: 'English', nativeName: 'English', color: 'from-red-100 to-white-700' },
   hi: { name: 'Hindi', nativeName: 'हिन्दी', color: 'from-orange-500 to-red-600' },
-  te: { name: 'Telugu', nativeName: 'తెలుగు', color: 'from-yellow-500 to-orange-600' },
+  te: { name: 'Telugu', nativeName: 'తెలుగు', color: 'from-yellow-100 to-orange-600' },
   ta: { name: 'Tamil', nativeName: 'தமிழ்', color: 'from-red-500 to-pink-600' },
   kn: { name: 'Kannada', nativeName: 'ಕನ್ನಡ', color: 'from-yellow-400 to-red-500' },
   ml: { name: 'Malayalam', nativeName: 'മലയാളം', color: 'from-green-500 to-teal-600' },
@@ -59,7 +59,7 @@ export function LanguageCard({
         'w-32 sm:w-36 md:w-40 aspect-square',
         'rounded-full overflow-hidden',
         'shadow-md transition-shadow duration-300',
-        'group-hover:shadow-xl group-hover:scale-105 transition-transform duration-300 relative'
+        'group-hover:shadow-xl group-hover:scale-95 transition-transform duration-300 relative'
       )}>
         {/* Gradient background */}
         <div className={cn(
@@ -69,24 +69,24 @@ export function LanguageCard({
         )} />
         
         {/* Content - centered */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center backdrop-blur-sm group-hover:backdrop-blur-md transition-all duration-300">
+        <div className="absolute inset-0 flex flex-col items-center justify-center backdrop-blur-sm group-hover:backdrop-blur-md transition-all duration-1000">
           {/* Large language code/letter */}
-          <div className="text-5xl sm:text-6xl md:text-7xl font-bold text-white/90 leading-none">
+          <div className="text-5xl sm:text-6xl md:text-7xl font-bold text-white/90 leading-none  group-hover:scale-110 transition-transform duration-1000" style={{fontFamily: 'Poppins, sans-serif', fontWeight: '300'}}>
             {displayCode}
           </div>
         </div>
 
         {/* Hover play button */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+        {/* <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
           <div className="bg-white/30 backdrop-blur-md rounded-full p-3 hover:bg-white/40 transition-colors duration-300">
             <Play className="h-6 w-6 text-white fill-white" />
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Language name below card */}
       <div className="text-center">
-        <h3 className="text-sm sm:text-base font-semibold text-foreground line-clamp-1">
+        <h3 className="text-sm sm:text-base font-semibold text-foreground line-clamp-1" style={{fontFamily: 'Poppins, sans-serif', fontWeight: '350'}}>
           {displayName}
         </h3>
         {contentCount > 0 && (

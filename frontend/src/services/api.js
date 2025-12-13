@@ -131,7 +131,7 @@ api.interceptors.response.use(
 const getAuthHeaders = async () => {
   const token = localStorage.getItem('accessToken');
   if (!token) {
-    throw new Error('No authentication token found');
+    throw new Error('No authentication token found. Please log in.');
   }
   return {
     Authorization: `Bearer ${token}`,
