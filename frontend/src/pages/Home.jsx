@@ -221,189 +221,213 @@ export default function Home() {
       {/* ========== FEATURED CARD CAROUSEL ========== */}
       {/* Mobile-responsive hero section with proper aspect ratios */}
       {featuredItems.length > 0 && (
-        <div className="w-full px-4 sm:px-6 md:px-8 mb-6 sm:mb-8 md:mb-10">
-          <motion.div
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.3 }}
-            className="relative w-full rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer group"
-            onClick={() => playTrack(featuredItem, featuredItems)}
-          >
-            
-            {/* Hero aspect ratio: mobile 2:1, tablet 2.5:1, desktop 3:1 */}
-            <div className="w-full min-w-0 relative">
-              <div className="aspect-square sm:aspect-video md:aspect-[3/1] lg:aspect-[4/1] w-full">
-                
-                {/* Background image - thumbnail on mobile, fallback on larger screens */}
-                {featuredItem.thumbnail ? (
-                  <>
-                    {/* Mobile: show actual thumbnail */}
-                    <img
-                      src={featuredItem.thumbnail}
-                      alt={featuredItem.title}
-                      className="block sm:hidden w-full h-full object-cover"
-                    />
-                    {/* Tablet/Desktop: show gradient fallback */}
-                    <div className="hidden sm:block w-full h-full">
-                      <ThumbnailFallback
-                        // title={featuredItem.title}
-                        id={featuredItem.id}
-                        isVideo={featuredItem.type === 'video'}
-                        size="large"
+        <div className="w-full px-4 sm:px-6 md:px-12 lg:px-8 xl:px-12 mb-6 sm:mb-8 md:mb-12">
+          {/* Desktop: wider card for large screens */}
+          <div className="w-full md:max-w-[1200px] lg:max-w-[1400px] xl:max-w-[1600px] md:mx-auto">
+            <motion.div
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
+              className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer group"
+              onClick={() => playTrack(featuredItem, featuredItems)}
+            >
+              
+              {/* Hero aspect ratio: mobile square, tablet video, desktop balanced */}
+              <div className="w-full min-w-0 relative">
+                <div className="aspect-square sm:aspect-video md:aspect-[2.5/1] lg:aspect-[2.4/1] xl:aspect-[2.5/1] w-full">
+                  
+                  {/* Background image - thumbnail on mobile, fallback on larger screens */}
+                  {featuredItem.thumbnail ? (
+                    <>
+                      {/* Mobile: show actual thumbnail */}
+                      <img
+                        src={featuredItem.thumbnail}
+                        alt={featuredItem.title}
+                        className="block sm:hidden w-full h-full object-cover"
                       />
-                    </div>
+                      {/* Tablet/Desktop: show gradient fallback */}
+                      <div className="hidden sm:block w-full h-full">
+                        <ThumbnailFallback
+                          // title={featuredItem.title}
+                          id={featuredItem.id}
+                          isVideo={featuredItem.type === 'video'}
+                          size="large"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    /* Fallback for items without thumbnails */
+                    <ThumbnailFallback
+                      title={featuredItem.title}
+                      id={featuredItem.id}
+                      isVideo={featuredItem.type === 'video'}
+                      size="large"
+                    />
+                  )}
+
+                  {/* Gradient overlays for text readability - enhanced on desktop */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent md:from-black/90 md:via-black/60" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent md:from-black/80" />
+                  {/* Desktop: add subtle edge vignette */}
+                  <div className="hidden md:block absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/30" />
+                </div>
+
+                {/* Carousel Navigation Buttons - Only show on larger screens or hover */}
+                {featuredItems.length > 1 && (
+                  <>
+                    {/* Previous button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      aria-label="Previous featured"
+                      onClick={handlePrev}
+                      className="absolute left-2 sm:left-4 md:left-6 lg:left-8 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 sm:p-3 md:p-4 shadow-lg backdrop-blur-sm transition-all duration-200 opacity-0 sm:opacity-100 group-hover:opacity-100"
+                    >
+                      <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 rotate-180" />
+                    </motion.button>
+
+                    {/* Next button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      aria-label="Next featured"
+                      onClick={handleNext}
+                      className="absolute right-2 sm:right-4 md:right-6 lg:right-8 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 sm:p-3 md:p-4 shadow-lg backdrop-blur-sm transition-all duration-200 opacity-0 sm:opacity-100 group-hover:opacity-100"
+                    >
+                      <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" />
+                    </motion.button>
                   </>
-                ) : (
-                  /* Fallback for items without thumbnails */
-                  <ThumbnailFallback
-                    title={featuredItem.title}
-                    id={featuredItem.id}
-                    isVideo={featuredItem.type === 'video'}
-                    size="large"
-                  />
                 )}
 
-                {/* Gradient overlays for text readability */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-              </div>
-
-              {/* Carousel Navigation Buttons - Only show on larger screens or hover */}
-              {featuredItems.length > 1 && (
-                <>
-                  {/* Previous button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    aria-label="Previous featured"
-                    onClick={handlePrev}
-                    className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 sm:p-3 shadow-lg backdrop-blur-sm transition-all duration-200 opacity-0 sm:opacity-100 group-hover:opacity-100"
-                  >
-                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6 rotate-180" />
-                  </motion.button>
-
-                  {/* Next button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    aria-label="Next featured"
-                    onClick={handleNext}
-                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 sm:p-3 shadow-lg backdrop-blur-sm transition-all duration-200 opacity-0 sm:opacity-100 group-hover:opacity-100"
-                  >
-                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
-                  </motion.button>
-                </>
-              )}
-
-              {/* Content - positioned at bottom with glass overlay */}
-              <div className="absolute inset-0 flex flex-col justify-end p-3 sm:p-4 md:p-6 lg:p-8">
-                
-                {/* Glass overlay container for content */}
-                <div className="glass-effect rounded-2xl p-4 sm:p-5 md:p-6">
-                  {/* Featured badge */}
-                  <motion.span 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.2, duration: 0.3 }}
-                    className="inline-flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm font-bold text-primary px-2 sm:px-3 md:px-4 py-1 sm:py-1.5 md:py-2 rounded-full w-fit mb-2 sm:mb-3 md:mb-4"
-                    style={{ background: 'rgba(34, 197, 94, 0.2)' }}
-                  >
-                    <Sparkles className="h-3 w-3 sm:h-4 sm:w-4" />
-                    FEATURED
-                  </motion.span>
-
-                  {/* Title - proper truncation on mobile */}
-                  <motion.h2 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25, duration: 0.3 }}
-                    className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-2 md:mb-3 line-clamp-2 min-w-0"
-                  >
-                    {featuredItem.title}
-                  </motion.h2>
-
-                  {/* Subtitle/Artist - hidden on very small screens */}
-                  <motion.p 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.3 }}
-                    className="text-white/80 text-xs sm:text-sm md:text-base mb-3 sm:mb-4 md:mb-6 line-clamp-1 min-w-0 hidden sm:block"
-                  >
-                    {featuredItem.artistName || featuredItem.subtitle || 'Start exploring amazing content'}
-                  </motion.p>
-
-                  {/* Action buttons */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.35, duration: 0.3 }}
-                    className="flex items-center gap-2 sm:gap-3 flex-wrap"
-                  >
-                    <Button 
-                      variant="spotify" 
-                      size="sm"
-                      className="shadow-lg h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlayAll();
-                      }}
+                {/* Content - mobile bottom; lg+ uses row layout with thumbnail + glass */}
+                <div className="absolute inset-0 flex flex-col justify-end p-3 sm:p-4 md:p-6 lg:flex-row lg:items-center lg:justify-start lg:gap-6 xl:gap-8 lg:p-8 xl:p-10">
+                  
+                  {/* Desktop-only thumbnail - positioned on left */}
+                  {featuredItem.thumbnail && (
+                    <div className="hidden lg:block flex-shrink-0">
+                      <div className="w-40 h-40 xl:w-48 xl:h-48 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+                        <img
+                          src={featuredItem.thumbnail}
+                          alt={featuredItem.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Glass overlay container - mobile: full width at bottom; lg+: constrained beside thumbnail */}
+                  <div className="rounded-2xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 xl:p-8 lg:max-w-xl xl:max-w-2xl lg:flex-1" style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+                  }}>
+                    {/* Featured badge */}
+                    <motion.span 
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.2, duration: 0.3 }}
+                      className="inline-flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm lg:text-sm font-bold text-primary px-2 sm:px-3 md:px-4 lg:px-4 py-1 sm:py-1.5 md:py-2 lg:py-1.5 rounded-full w-fit mb-2 sm:mb-3 md:mb-4 lg:mb-3"
+                      style={{ background: 'rgba(34, 197, 94, 0.2)' }}
                     >
-                      <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2 flex-shrink-0" fill="currentColor" />
-                      <span className="truncate">Play</span>
-                    </Button>
+                      <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-4 lg:w-4" />
+                      FEATURED
+                    </motion.span>
 
-                    {/* Type badge */}
-                    <span 
-                      className={cn(
-                        'px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md flex-shrink-0',
-                        featuredItem.type === 'video' ? 'text-[#6366F1]' : 'text-[#22C55E]'
-                      )}
-                      style={featuredItem.type === 'video'
-                        ? { background: 'rgba(99, 102, 241, 0.15)' }
-                        : { background: 'rgba(34, 197, 94, 0.15)' }
-                      }
+                    {/* Title - scaled for glass container */}
+                    <motion.h2 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.25, duration: 0.3 }}
+                      className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-bold text-white mb-1 sm:mb-2 md:mb-3 lg:mb-3 line-clamp-2 min-w-0 leading-tight"
                     >
-                      {featuredItem.type === 'video' ? '🎬' : '🎵'}
-                    </span>
+                      {featuredItem.title}
+                    </motion.h2>
 
-                    {/* Language badge */}
-                    <span 
-                      className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold backdrop-blur-md text-[#EDE9FE] flex-shrink-0 flex items-center gap-1"
-                      style={{ background: 'rgba(139, 92, 246, 0.2)' }}
+                    {/* Subtitle/Artist */}
+                    <motion.p 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.3 }}
+                      className="text-white/80 text-xs sm:text-sm md:text-base lg:text-base mb-3 sm:mb-4 md:mb-4 lg:mb-4 line-clamp-1 min-w-0 hidden sm:block"
                     >
-                      🌐 {getLanguageName(featuredItem.language || 'en')}
-                    </span>
-                  </motion.div>
+                      {featuredItem.artistName || featuredItem.subtitle || 'Start exploring amazing content'}
+                    </motion.p>
+
+                    {/* Action buttons */}
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.35, duration: 0.3 }}
+                      className="flex items-center gap-2 sm:gap-3 md:gap-3 lg:gap-3 flex-wrap"
+                    >
+                      <Button 
+                        variant="spotify" 
+                        size="sm"
+                        className="shadow-lg h-8 sm:h-10 md:h-11 lg:h-11 px-3 sm:px-4 md:px-5 lg:px-6 text-xs sm:text-sm md:text-sm lg:text-sm font-bold"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayAll();
+                        }}
+                      >
+                        <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4 lg:h-5 lg:w-5 mr-1 sm:mr-2 flex-shrink-0" fill="currentColor" />
+                        <span className="truncate">Play</span>
+                      </Button>
+
+                      {/* Type badge */}
+                      <span 
+                        className={cn(
+                          'px-2 sm:px-3 md:px-3 py-0.5 sm:py-1 md:py-1 rounded-full text-[10px] sm:text-xs md:text-xs font-bold backdrop-blur-md flex-shrink-0',
+                          featuredItem.type === 'video' ? 'text-[#6366F1]' : 'text-[#22C55E]'
+                        )}
+                        style={featuredItem.type === 'video'
+                          ? { background: 'rgba(99, 102, 241, 0.15)' }
+                          : { background: 'rgba(34, 197, 94, 0.15)' }
+                        }
+                      >
+                        {featuredItem.type === 'video' ? '🎬' : '🎵'}
+                      </span>
+
+                      {/* Language badge */}
+                      <span 
+                        className="px-2 sm:px-3 md:px-3 py-0.5 sm:py-1 md:py-1 rounded-full text-[10px] sm:text-xs md:text-xs font-bold backdrop-blur-md text-[#EDE9FE] flex-shrink-0 flex items-center gap-1"
+                        style={{ background: 'rgba(139, 92, 246, 0.2)' }}
+                      >
+                        🌐 {getLanguageName(featuredItem.language || 'en')}
+                      </span>
+                    </motion.div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Carousel Dots - Bottom center */}
-              {featuredItems.length > 1 && (
-                <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-                  {featuredItems.map((_, idx) => (
-                    <motion.button
-                      key={idx}
-                      whileHover={{ scale: 1.2 }}
-                      whileTap={{ scale: 0.9 }}
-                      aria-label={`Go to featured ${idx + 1}`}
-                      className={cn(
-                        'rounded-full transition-all duration-200',
-                        idx === featuredIndex 
-                          ? 'bg-primary w-3 sm:w-4 h-2.5 sm:h-3' 
-                          : 'bg-white/40 w-2.5 sm:w-3 h-2.5 sm:h-3'
-                      )}
-                      onClick={e => {
-                        e.stopPropagation();
-                        setFeaturedIndex(idx);
-                        resetAutoScroll();
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+                {/* Carousel Dots - Bottom center */}
+                {featuredItems.length > 1 && (
+                  <div className="absolute bottom-3 sm:bottom-4 md:bottom-6 lg:bottom-8 left-1/2 -translate-x-1/2 flex gap-2 md:gap-3 z-20">
+                    {featuredItems.map((_, idx) => (
+                      <motion.button
+                        key={idx}
+                        whileHover={{ scale: 1.2 }}
+                        whileTap={{ scale: 0.9 }}
+                        aria-label={`Go to featured ${idx + 1}`}
+                        className={cn(
+                          'rounded-full transition-all duration-200',
+                          idx === featuredIndex 
+                            ? 'bg-primary w-3 sm:w-4 md:w-5 h-2.5 sm:h-3 md:h-3.5' 
+                            : 'bg-white/40 w-2.5 sm:w-3 md:w-4 h-2.5 sm:h-3 md:h-3.5'
+                        )}
+                        onClick={e => {
+                          e.stopPropagation();
+                          setFeaturedIndex(idx);
+                          resetAutoScroll();
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
         </div>
       )}
 
