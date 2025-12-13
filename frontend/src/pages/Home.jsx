@@ -229,8 +229,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.3 }}
-              className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 cursor-pointer group"
-              onClick={() => playTrack(featuredItem, featuredItems)}
+              className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 group"
             >
               
               {/* Hero aspect ratio: mobile square, tablet video, desktop balanced */}
@@ -300,13 +299,13 @@ export default function Home() {
                   </>
                 )}
 
-                {/* Content - mobile bottom; lg+ uses row layout with thumbnail + glass */}
-                <div className="absolute inset-0 flex flex-col justify-end p-3 sm:p-4 md:p-6 lg:flex-row lg:items-center lg:justify-start lg:gap-6 xl:gap-8 lg:p-8 xl:p-10">
+                {/* Content - mobile bottom; md+ uses row layout with thumbnail + glass */}
+                <div className="absolute inset-0 flex flex-col justify-end p-3 sm:p-4 md:flex-row md:items-center md:justify-start md:gap-4 md:p-6 lg:gap-6 xl:gap-8 lg:p-8 xl:p-10">
                   
-                  {/* Desktop-only thumbnail - positioned on left */}
+                  {/* Tablet/Desktop thumbnail - positioned on left (md+) */}
                   {featuredItem.thumbnail && (
-                    <div className="hidden lg:block flex-shrink-0">
-                      <div className="w-40 h-40 xl:w-48 xl:h-48 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+                    <div className="hidden md:block flex-shrink-0">
+                      <div className="w-28 h-28 md:w-32 md:h-32 lg:w-40 lg:h-40 xl:w-48 xl:h-48 rounded-xl md:rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
                         <img
                           src={featuredItem.thumbnail}
                           alt={featuredItem.title}
@@ -316,8 +315,8 @@ export default function Home() {
                     </div>
                   )}
                   
-                  {/* Glass overlay container - mobile: full width at bottom; lg+: constrained beside thumbnail */}
-                  <div className="rounded-2xl lg:rounded-2xl p-4 sm:p-5 lg:p-6 xl:p-8 lg:max-w-xl xl:max-w-2xl lg:flex-1" style={{
+                  {/* Glass overlay container - mobile: full width at bottom; md+: constrained beside thumbnail */}
+                  <div className="rounded-2xl p-4 sm:p-5 md:p-4 md:max-w-sm lg:p-6 lg:max-w-xl xl:p-8 xl:max-w-2xl md:flex-1" style={{
                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%)',
                     backdropFilter: 'blur(20px)',
                     WebkitBackdropFilter: 'blur(20px)',
@@ -329,10 +328,10 @@ export default function Home() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2, duration: 0.3 }}
-                      className="inline-flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-sm lg:text-sm font-bold text-primary px-2 sm:px-3 md:px-4 lg:px-4 py-1 sm:py-1.5 md:py-2 lg:py-1.5 rounded-full w-fit mb-2 sm:mb-3 md:mb-4 lg:mb-3"
+                      className="inline-flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs md:text-xs lg:text-sm font-bold text-primary px-2 sm:px-3 md:px-3 lg:px-4 py-1 sm:py-1.5 md:py-1 lg:py-1.5 rounded-full w-fit mb-2 sm:mb-3 md:mb-2 lg:mb-3"
                       style={{ background: 'rgba(34, 197, 94, 0.2)' }}
                     >
-                      <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-4 lg:w-4" />
+                      <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 md:h-3 md:w-3 lg:h-4 lg:w-4" />
                       FEATURED
                     </motion.span>
 
@@ -341,7 +340,7 @@ export default function Home() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.25, duration: 0.3 }}
-                      className="text-xl sm:text-2xl md:text-3xl lg:text-3xl xl:text-4xl font-bold text-white mb-1 sm:mb-2 md:mb-3 lg:mb-3 line-clamp-2 min-w-0 leading-tight"
+                      className="text-xl sm:text-2xl md:text-xl lg:text-2xl xl:text-3xl font-bold text-white mb-1 sm:mb-2 md:mb-2 lg:mb-3 line-clamp-2 min-w-0 leading-tight"
                     >
                       {featuredItem.title}
                     </motion.h2>
@@ -351,7 +350,7 @@ export default function Home() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3, duration: 0.3 }}
-                      className="text-white/80 text-xs sm:text-sm md:text-base lg:text-base mb-3 sm:mb-4 md:mb-4 lg:mb-4 line-clamp-1 min-w-0 hidden sm:block"
+                      className="text-white/80 text-xs sm:text-sm md:text-sm lg:text-base mb-3 sm:mb-4 md:mb-3 lg:mb-4 line-clamp-1 min-w-0 hidden sm:block"
                     >
                       {featuredItem.artistName || featuredItem.subtitle || 'Start exploring amazing content'}
                     </motion.p>
@@ -361,18 +360,18 @@ export default function Home() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.35, duration: 0.3 }}
-                      className="flex items-center gap-2 sm:gap-3 md:gap-3 lg:gap-3 flex-wrap"
+                      className="flex items-center gap-2 sm:gap-3 md:gap-2 lg:gap-3 flex-wrap"
                     >
                       <Button 
                         variant="spotify" 
                         size="sm"
-                        className="shadow-lg h-8 sm:h-10 md:h-11 lg:h-11 px-3 sm:px-4 md:px-5 lg:px-6 text-xs sm:text-sm md:text-sm lg:text-sm font-bold"
+                        className="shadow-lg h-8 sm:h-10 md:h-9 lg:h-10 px-3 sm:px-4 md:px-4 lg:px-5 text-xs sm:text-sm md:text-xs lg:text-sm font-bold"
                         onClick={(e) => {
                           e.stopPropagation();
                           handlePlayAll();
                         }}
                       >
-                        <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4 lg:h-5 lg:w-5 mr-1 sm:mr-2 flex-shrink-0" fill="currentColor" />
+                        <Play className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 mr-1 sm:mr-2 flex-shrink-0" fill="currentColor" />
                         <span className="truncate">Play</span>
                       </Button>
 
