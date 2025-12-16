@@ -119,7 +119,7 @@ export default function InstallPrompt() {
             <div className="bg-card border border-border rounded-xl shadow-2xl p-4">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <img src="/logo192.svg" alt="MediaCore" className="w-8 h-8" />
+                  <img src="/logo192.png" alt="MediaCore" className="w-8 h-8" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm">Open in App</h3>
@@ -164,7 +164,7 @@ export default function InstallPrompt() {
             <div className="bg-card border border-border rounded-xl shadow-2xl p-4">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <img src="/logo192.svg" alt="MediaCore" className="w-8 h-8" />
+                  <img src="/logo192.png" alt="MediaCore" className="w-8 h-8" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm">Install MediaCore</h3>

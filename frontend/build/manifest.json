@@ -3,20 +3,20 @@
   "name": "MediaCore - Audio & Video Streaming",
   "icons": [
     {
-      "src": "favicon.svg",
+      "src": "favicon.png",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "logo192.svg",
+      "src": "logo192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "logo512.svg",
+      "src": "logo512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
@@ -32,14 +32,14 @@
       "short_name": "Search",
       "description": "Search for media",
       "url": "/search",
-      "icons": [{ "src": "logo192.svg", "sizes": "192x192" }]
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
     },
     {
       "name": "Library",
       "short_name": "Library",
       "description": "Your media library",
       "url": "/library",
-      "icons": [{ "src": "logo192.svg", "sizes": "192x192" }]
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
     }
   ]
 }
