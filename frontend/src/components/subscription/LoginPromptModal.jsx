@@ -48,8 +48,8 @@ export default function LoginPromptModal({ open, onOpenChange }) {
   const benefits = [
     {
       icon: Clock,
-      title: '10 Minutes Free',
-      description: 'Get 10 minutes of listening per session',
+      title: 'Unlimited Minutes Free',
+      description: 'Get 5 hours of listening per session',
     },
     {
       icon: Headphones,
