@@ -131,7 +131,7 @@ export default function LoginPromptModal({ open, onOpenChange }) {
         </div>
 
         <p className="text-xs text-center text-muted-foreground mt-2">
-          Free accounts include 10 minutes of listening every 2 hours
+          Free accounts include 5 hours of listening every 24 hours
         </p>
       </DialogContent>
     </Dialog>

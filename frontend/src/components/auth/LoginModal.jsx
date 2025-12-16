@@ -215,7 +215,7 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@mediacore.com"
+                placeholder="email@mediacore.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10"
@@ -279,7 +279,7 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
           </div>
 
           {/* Divider - only show for login mode */}
-          {!isSignUpMode && (
+          {/* {!isSignUpMode && (
             <>
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
@@ -290,10 +290,10 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
                     Default Credentials
                   </span>
                 </div>
-              </div>
+              </div> */}
 
-              {/* Default admin info */}
-              <div className="text-center text-sm space-y-2 p-4 bg-muted/50 rounded-lg">
+              {/* Default admin info - test account*/}
+              {/* <div className="text-center text-sm space-y-2 p-4 bg-muted/50 rounded-lg">
                 <p className="font-medium text-muted-foreground">Test Account:</p>
                 <div className="font-mono text-xs space-y-1">
                   <p>
@@ -332,7 +332,7 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
                 </p>
               </div>
             </>
-          )}
+          )} */}
         </form>
 
         {/* Features preview */}
