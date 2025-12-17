@@ -125,9 +125,8 @@ export default function ShareMenu({
   // Generate URLs
   const getShareUrl = useCallback(() => {
     if (!media) return '';
-    // Use /og/:id endpoint which serves dynamic OG tags for crawlers
-    // Regular users will be redirected to the actual app URL
-    return `${APP_DOMAIN}/og/${media.id}`;
+    // Passenger-safe: use /api/og/:id which is guaranteed to hit Node
+    return `${APP_DOMAIN}/api/og/${media.id}`;
   }, [media]);
 
   const getEmbedUrl = useCallback(() => {
