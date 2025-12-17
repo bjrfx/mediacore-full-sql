@@ -125,8 +125,7 @@ export default function ShareMenu({
   // Generate URLs
   const getShareUrl = useCallback(() => {
     if (!media) return '';
-    // Passenger-safe: use /api/og/:id which is guaranteed to hit Node
-    return `${APP_DOMAIN}/api/og/${media.id}`;
+    return `${APP_DOMAIN}/share/${media.id}`;
   }, [media]);
 
   const getEmbedUrl = useCallback(() => {
