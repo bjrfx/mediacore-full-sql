@@ -125,8 +125,9 @@ export default function ShareMenu({
   // Generate URLs
   const getShareUrl = useCallback(() => {
     if (!media) return '';
-    const type = media.type === 'video' ? 'watch' : 'listen';
-    return `${APP_DOMAIN}/${type}/${media.id}`;
+    // Use /og/:id endpoint which serves dynamic OG tags for crawlers
+    // Regular users will be redirected to the actual app URL
+    return `${APP_DOMAIN}/og/${media.id}`;
   }, [media]);
 
   const getEmbedUrl = useCallback(() => {
