@@ -21,6 +21,7 @@ const { checkAdminAuth } = require('../middleware');
 // Multer configuration for bulk uploads
 const UPLOAD_BASE_PATH = process.env.UPLOAD_BASE_PATH || path.join(__dirname, '../public');
 const UPLOAD_DIR = path.join(UPLOAD_BASE_PATH, 'uploads');
+const PRODUCTION_URL = 'https://mediacoreapi-sql.masakalirestrobar.ca';
 
 // Multer storage with field parser
 const storage = multer.diskStorage({
@@ -634,9 +635,21 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
         
         console.log('[CREATE MEDIA] File metadata:', metadata);
         
-        // For HLS directories, use the playlist URL
-        const mediaUrl = metadata.hlsPlaylistUrl || metadata.publicUrl;
+        // For HLS directories, use the full production URL for playlist
+        let mediaUrl = metadata.publicUrl;
+        let hlsPlaylistUrl = null;
         const isHLS = type === 'hls' || metadata.type === 'hls';
+        
+        if (isHLS && metadata.hlsPlaylistUrl) {
+          // Convert relative path to absolute URL
+          hlsPlaylistUrl = metadata.hlsPlaylistUrl.startsWith('http')
+            ? metadata.hlsPlaylistUrl
+            : `${PRODUCTION_URL}${metadata.hlsPlaylistUrl}`;
+          mediaUrl = hlsPlaylistUrl;
+        }
+        
+        // Also convert thumbnail to absolute URL if provided
+        let thumbnailUrl = thumbnailPath ? `${PRODUCTION_URL}/uploads/${thumbnailPath}` : null;
         
         // Create media entry
         const mediaId = uuidv4();
@@ -645,13 +658,13 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
           title: name.replace(/\.[^/.]+$/, ''), // Remove extension
           type: isHLS ? (mediaType || 'video') : type, // Use mediaType for HLS, default to video
           url: mediaUrl,
-          thumbnail_url: thumbnailPath || null,
+          thumbnail_url: thumbnailUrl,
           artist_id: artistId || null,
           album_id: albumId || null,
           language: language,
           file_size: metadata.size || 0,
           is_hls: isHLS,
-          hls_playlist_url: isHLS ? mediaUrl : null,
+          hls_playlist_url: hlsPlaylistUrl,
         };
         
         console.log('[CREATE MEDIA] Creating media with data:', mediaData);
