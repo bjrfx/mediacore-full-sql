@@ -86,14 +86,17 @@ app.get("/share/:mediaId", async (req, res) => {
       media.description ||
       `${isVideo ? "Watch" : "Listen to"} "${title}"${media.artist ? ` by ${media.artist}` : ""} on MediaCore`;
 
+    // Prefer backend-provided thumbnail fields; fall back to logo
+    const thumb = media.thumbnailUrl || media.thumbnail || media.thumbnail_path;
     let image = `${APP_DOMAIN}/logo512.png`;
-    if (media.thumbnail_path) {
-      if (media.thumbnail_path.startsWith("http")) {
-        image = media.thumbnail_path;
-      } else if (media.thumbnail_path.startsWith("/")) {
-        image = `${APP_DOMAIN}${media.thumbnail_path}`;
+
+    if (thumb) {
+      if (thumb.startsWith("http")) {
+        image = thumb;
+      } else if (thumb.startsWith("/")) {
+        image = `${APP_DOMAIN}${thumb}`;
       } else {
-        image = `${APP_DOMAIN}/${media.thumbnail_path}`;
+        image = `${APP_DOMAIN}/${thumb}`;
       }
     }
 
