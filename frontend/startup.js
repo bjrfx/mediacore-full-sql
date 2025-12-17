@@ -4,6 +4,7 @@ const path = require("path");
 const app = express();
 const BACKEND_API = process.env.BACKEND_API || "https://mediacoreapi-sql.masakalirestrobar.ca";
 const APP_DOMAIN = process.env.APP_DOMAIN || "https://app.mediacore.in";
+const API_KEY = process.env.BACKEND_API_KEY || process.env.REACT_APP_PUBLIC_API_KEY || "mc_3f177f8a673446ba8ee152728d877b00";
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 function log(message, source = "express") {
@@ -56,10 +57,10 @@ app.get("/share/:mediaId", async (req, res) => {
     const backendUrl = `${BACKEND_API}/api/media/${mediaId}`;
     log(`OG fetch: ${backendUrl}`, "og");
 
+    const headers = API_KEY ? { "x-api-key": API_KEY } : {};
+
     const backendResponse = await fetch(backendUrl, {
-      headers: {
-        "x-api-key": process.env.BACKEND_API_KEY || "test",
-      },
+      headers,
       signal: AbortSignal.timeout(5000),
     });
 
