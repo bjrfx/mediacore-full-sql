@@ -185,9 +185,10 @@ router.get('/api/albums/:id/media', checkApiKeyPermissions(), async (req, res) =
       type: item.type,
       fileUrl: item.file_path,
       filePath: item.file_path,
+      streamUrl: item.hls_playlist_url || item.file_path, // For HLS, use playlist URL
       fileSize: item.file_size,
-      thumbnail: item.thumbnail,
-      thumbnailUrl: item.thumbnail,
+      thumbnail: item.thumbnail_path || item.thumbnail,
+      thumbnailUrl: item.thumbnail_path || item.thumbnail,
       duration: item.duration,
       artistId: item.artist_id,
       artistName: album.artist_name || '',

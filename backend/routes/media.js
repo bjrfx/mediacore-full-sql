@@ -31,6 +31,24 @@ const PRODUCTION_URL = 'https://mediacoreapi-sql.masakalirestrobar.ca';
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB for regular uploads
 const MAX_HLS_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB for HLS bundles
 
+// Transform media data from database format to API format
+const transformMediaForResponse = (media) => {
+  if (!media) return null;
+  
+  return {
+    ...media,
+    // Map database field names to frontend-expected names
+    fileUrl: media.file_path || media.fileUrl,
+    streamUrl: media.hls_playlist_url || media.file_path || media.streamUrl,
+    thumbnailUrl: media.thumbnail_path || media.thumbnailUrl,
+    // Keep original fields for compatibility
+    file_path: media.file_path,
+    thumbnail_path: media.thumbnail_path,
+    hls_playlist_url: media.hls_playlist_url,
+    is_hls: media.is_hls || false,
+  };
+};
+
 // Allowed file types
 const ALLOWED_MIME_TYPES = {
   video: [
@@ -464,9 +482,11 @@ router.get('/api/media/:id', checkApiKeyPermissions(), async (req, res) => {
       duration: row.duration,
       fileUrl: row.file_path,
       filePath: row.file_path,
+      streamUrl: row.hls_playlist_url || row.file_path, // For HLS, use playlist URL
       fileSize: row.file_size,
-      thumbnailUrl: row.thumbnail,
-      isHls: row.is_hls,
+      thumbnailUrl: row.thumbnail_path || row.thumbnail,
+      isHls: row.is_hls || false,
+      hlsPlaylistUrl: row.hls_playlist_url,
       contentGroupId: row.content_group_id,
       subscriptionTier: row.subscription_tier,
       createdAt: row.created_at,
@@ -1323,14 +1343,17 @@ router.get('/admin/media', checkAdminAuth, async (req, res) => {
       subtitle: item.subtitle,
       type: item.type,
       filePath: item.file_path,
-      thumbnailUrl: item.thumbnail,
+      fileUrl: item.file_path,
+      streamUrl: item.hls_playlist_url || item.file_path,
+      thumbnailUrl: item.thumbnail_path || item.thumbnail,
       fileSize: item.file_size,
       duration: item.duration,
       artistId: item.artist_id,
       albumId: item.album_id,
       language: item.language,
       contentGroupId: item.content_group_id,
-      isHls: item.is_hls,
+      isHls: item.is_hls || false,
+      hlsPlaylistUrl: item.hls_playlist_url,
       createdAt: item.created_at,
       updatedAt: item.updated_at
     }));
