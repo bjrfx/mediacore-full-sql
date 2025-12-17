@@ -126,11 +126,18 @@ export function FilePickerModal({
   });
 
   const toggleFileSelection = (file) => {
-    if (file.isDirectory) {
+    // Allow selecting HLS folders (or folders when looking for HLS content)
+    const canSelectFolder = file.isDirectory && 
+      (file.type === 'hls' || filterType === 'hls' || 
+       (allowedTypes && allowedTypes.includes('hls')));
+    
+    if (file.isDirectory && !canSelectFolder) {
+      // Navigate into non-HLS folders
       setCurrentPath(file.path);
       return;
     }
 
+    // Select files or HLS folders
     if (multiSelect) {
       setSelectedFiles(prev => {
         const exists = prev.find(f => f.id === file.id);
@@ -251,6 +258,9 @@ export function FilePickerModal({
               {filteredFiles.map((file) => {
                 const Icon = getFileIcon(file.type);
                 const isSelected = selectedFiles.find(f => f.id === file.id);
+                const canSelectFolder = file.isDirectory && 
+                  (file.type === 'hls' || filterType === 'hls' || 
+                   (allowedTypes && allowedTypes.includes('hls')));
 
                 return (
                   <div
@@ -261,7 +271,7 @@ export function FilePickerModal({
                     )}
                     onClick={() => toggleFileSelection(file)}
                   >
-                    {!file.isDirectory && (
+                    {(!file.isDirectory || canSelectFolder) && (
                       <Checkbox
                         checked={!!isSelected}
                         onCheckedChange={() => toggleFileSelection(file)}
@@ -274,7 +284,8 @@ export function FilePickerModal({
                       file.type === 'audio' && 'text-purple-500',
                       file.type === 'image' && 'text-green-500',
                       file.type === 'subtitle' && 'text-orange-500',
-                      file.type === 'folder' && 'text-yellow-500'
+                      file.type === 'folder' && 'text-yellow-500',
+                      file.type === 'hls' && 'text-cyan-500'
                     )} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{file.name}</p>

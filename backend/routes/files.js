@@ -22,14 +22,16 @@ const { checkAdminAuth } = require('../middleware');
 const UPLOAD_BASE_PATH = process.env.UPLOAD_BASE_PATH || path.join(__dirname, '../public');
 const UPLOAD_DIR = path.join(UPLOAD_BASE_PATH, 'uploads');
 
+// Multer storage with field parser
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // Get target directory from request body or default to appropriate folder
+    // targetDir should be available in req.body if appended before files in FormData
+    // If not present, fall back to auto-detection
     const targetDir = req.body.targetDir || '';
-    const fileType = req.body.fileType || 'auto';
     
     let destPath;
     if (targetDir) {
+      // User specified target directory - use it
       destPath = path.join(UPLOAD_DIR, targetDir);
     } else {
       // Auto-detect destination based on file type
@@ -55,11 +57,25 @@ const storage = multer.diskStorage({
     cb(null, destPath);
   },
   filename: (req, file, cb) => {
-    // Preserve original filename or generate unique name
-    const preserveName = req.body.preserveNames === 'true';
+    // Preserve original filename by default (safer for user-managed files)
+    const preserveName = req.body.preserveNames !== 'false';
     
     if (preserveName) {
-      cb(null, file.originalname);
+      // Keep original filename - handle duplicates by appending number if needed
+      const targetDir = req.body.targetDir || '';
+      const destPath = path.join(UPLOAD_DIR, targetDir);
+      let filename = file.originalname;
+      let counter = 1;
+      
+      // Check if file exists and append counter if needed
+      while (fs.existsSync(path.join(destPath, filename))) {
+        const ext = path.extname(file.originalname);
+        const base = path.basename(file.originalname, ext);
+        filename = `${base} (${counter})${ext}`;
+        counter++;
+      }
+      
+      cb(null, filename);
     } else {
       const uniqueName = `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`;
       cb(null, uniqueName);
@@ -263,20 +279,75 @@ router.post('/api/files/upload', checkAdminAuth, upload.array('files', 50), asyn
       });
     }
     
-    const uploadedFiles = req.files.map(file => {
+    const targetDir = req.body.targetDir || '';
+    const isHLSFolder = targetDir.includes('hls');
+    const uploadedFiles = [];
+    
+    // Process each file
+    for (const file of req.files) {
       const relativePath = path.relative(UPLOAD_DIR, file.path);
       const fileType = fileStorage.detectFileType(file.originalname, file.mimetype);
+      const isZip = path.extname(file.originalname).toLowerCase() === '.zip';
       
-      return {
-        name: file.filename,
-        originalName: file.originalname,
-        path: relativePath,
-        publicUrl: `/uploads/${relativePath.replace(/\\/g, '/')}`,
-        type: fileType,
-        size: file.size,
-        mimetype: file.mimetype
-      };
-    });
+      // Auto-extract zip files in HLS folder
+      if (isZip && isHLSFolder) {
+        try {
+          const zipPath = file.path;
+          const extractFolderName = path.basename(file.originalname, '.zip');
+          const extractPath = path.join(path.dirname(file.path), extractFolderName);
+          
+          // Create extraction directory
+          if (!fs.existsSync(extractPath)) {
+            fs.mkdirSync(extractPath, { recursive: true });
+          }
+          
+          // Extract zip
+          await fs.createReadStream(zipPath)
+            .pipe(unzipper.Extract({ path: extractPath }))
+            .promise();
+          
+          // Delete zip after extraction
+          fs.unlinkSync(zipPath);
+          
+          // Add extracted folder to response
+          const extractedRelPath = path.relative(UPLOAD_DIR, extractPath);
+          uploadedFiles.push({
+            name: extractFolderName,
+            originalName: file.originalname,
+            path: extractedRelPath,
+            publicUrl: `/uploads/${extractedRelPath.replace(/\\/g, '/')}`,
+            type: 'hls',
+            isDirectory: true,
+            extracted: true,
+            message: 'ZIP extracted successfully'
+          });
+        } catch (extractError) {
+          console.error('Error extracting zip:', extractError);
+          // If extraction fails, keep the zip file
+          uploadedFiles.push({
+            name: file.filename,
+            originalName: file.originalname,
+            path: relativePath,
+            publicUrl: `/uploads/${relativePath.replace(/\\/g, '/')}`,
+            type: fileType,
+            size: file.size,
+            mimetype: file.mimetype,
+            error: 'Failed to extract ZIP'
+          });
+        }
+      } else {
+        // Regular file upload
+        uploadedFiles.push({
+          name: file.filename,
+          originalName: file.originalname,
+          path: relativePath,
+          publicUrl: `/uploads/${relativePath.replace(/\\/g, '/')}`,
+          type: fileType,
+          size: file.size,
+          mimetype: file.mimetype
+        });
+      }
+    }
     
     res.json({
       success: true,

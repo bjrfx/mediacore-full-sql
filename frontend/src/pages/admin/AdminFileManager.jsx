@@ -201,8 +201,10 @@ export default function AdminFileManager() {
 
     try {
       const formData = new FormData();
-      uploadedFiles.forEach(file => formData.append('files', file));
+      // IMPORTANT: Append text fields BEFORE files for multer to read them
       formData.append('targetDir', currentPath);
+      formData.append('preserveNames', 'true');
+      uploadedFiles.forEach(file => formData.append('files', file));
 
       const token = localStorage.getItem('accessToken');
       await axios.post(`${API_BASE_URL}/api/files/upload`, formData, {
