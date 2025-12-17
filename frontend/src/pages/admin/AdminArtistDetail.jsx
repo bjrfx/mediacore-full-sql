@@ -506,6 +506,8 @@ export default function AdminArtistDetail() {
   };
 
   const handleCreateMediaFromFiles = async () => {
+    console.log('[CREATE MEDIA] Starting, selectedFiles:', selectedFiles);
+    
     if (selectedFiles.length === 0) {
       addToast({ message: 'No files selected', type: 'error' });
       return;
@@ -526,6 +528,8 @@ export default function AdminArtistDetail() {
         };
       });
 
+      console.log('[CREATE MEDIA] Prepared filesData:', filesData);
+
       // Create media entries from files
       const token = localStorage.getItem('accessToken');
       const response = await axios.post(
@@ -540,6 +544,8 @@ export default function AdminArtistDetail() {
           headers: { Authorization: `Bearer ${token}` }
         }
       );
+
+      console.log('[CREATE MEDIA] Response:', response.data);
 
       if (response.data.success && response.data.data.created.length > 0) {
         // Get current track count
@@ -580,7 +586,8 @@ export default function AdminArtistDetail() {
         throw new Error('Failed to create media entries');
       }
     } catch (error) {
-      console.error('Error creating media from files:', error);
+      console.error('[CREATE MEDIA] Error:', error);
+      console.error('[CREATE MEDIA] Error response:', error.response?.data);
       addToast({
         message: error.response?.data?.message || 'Failed to create media from files',
         type: 'error'

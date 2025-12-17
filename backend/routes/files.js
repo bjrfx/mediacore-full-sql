@@ -604,6 +604,8 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
   try {
     const { files, artistId, albumId, language = 'en' } = req.body;
     
+    console.log('[CREATE MEDIA] Request received:', { filesCount: files?.length, artistId, albumId, language });
+    
     if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({
         success: false,
@@ -619,6 +621,8 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
       try {
         const { path: filePath, name, type, subtitlePath, thumbnailPath } = file;
         
+        console.log('[CREATE MEDIA] Processing file:', { filePath, name, type });
+        
         // Validate file type is audio or video
         if (!['audio', 'video', 'hls'].includes(type)) {
           errors.push({ file: name, error: 'Invalid file type. Must be audio, video, or HLS' });
@@ -628,23 +632,33 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
         // Get file metadata
         const metadata = await fileStorage.getFileMetadata(filePath);
         
+        console.log('[CREATE MEDIA] File metadata:', metadata);
+        
+        // For HLS directories, use the playlist URL
+        const mediaUrl = metadata.hlsPlaylistUrl || metadata.publicUrl;
+        const isHLS = type === 'hls' || metadata.type === 'hls';
+        
         // Create media entry
         const mediaId = uuidv4();
         const mediaData = {
           id: mediaId,
           title: name.replace(/\.[^/.]+$/, ''), // Remove extension
-          type: type === 'hls' ? 'video' : type,
-          url: metadata.publicUrl,
+          type: isHLS ? 'video' : type,
+          url: mediaUrl,
           thumbnail_url: thumbnailPath || null,
           artist_id: artistId || null,
           album_id: albumId || null,
           language: language,
-          file_size: metadata.size,
-          is_hls: type === 'hls',
-          hls_playlist_url: type === 'hls' ? metadata.publicUrl : null,
+          file_size: metadata.size || 0,
+          is_hls: isHLS,
+          hls_playlist_url: isHLS ? mediaUrl : null,
         };
         
+        console.log('[CREATE MEDIA] Creating media with data:', mediaData);
+        
         const insertId = await mediaDAO.create(mediaData);
+        
+        console.log('[CREATE MEDIA] Media created with ID:', mediaId);
         
         // Add subtitle if provided
         if (subtitlePath) {
@@ -666,11 +680,15 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
           url: mediaData.url,
           thumbnail: mediaData.thumbnail_url,
         });
+        
+        console.log('[CREATE MEDIA] Successfully created:', mediaId);
       } catch (error) {
-        console.error('Error creating media from file:', error);
+        console.error('[CREATE MEDIA] Error creating media from file:', error);
         errors.push({ file: file.name, error: error.message });
       }
     }
+    
+    console.log('[CREATE MEDIA] Completed. Created:', createdMedia.length, 'Failed:', errors.length);
     
     res.json({
       success: errors.length === 0,

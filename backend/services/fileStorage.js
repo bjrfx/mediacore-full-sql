@@ -309,7 +309,7 @@ class FileStorageService {
       const fileType = this.detectFileType(path.basename(filePath));
       const publicUrl = `/uploads/${filePath.replace(/\\/g, '/')}`;
       
-      return {
+      const metadata = {
         name: path.basename(filePath),
         path: filePath,
         fullPath: fullPath,
@@ -321,6 +321,20 @@ class FileStorageService {
         updatedAt: stats.mtime,
         extension: path.extname(filePath),
       };
+      
+      // For HLS directories, find the .m3u8 playlist file
+      if (stats.isDirectory()) {
+        const files = await fs.readdir(fullPath);
+        const m3u8File = files.find(f => f.endsWith('.m3u8'));
+        
+        if (m3u8File) {
+          metadata.type = 'hls';
+          metadata.hlsPlaylistUrl = `/uploads/${filePath.replace(/\\/g, '/')}/${m3u8File}`;
+          metadata.hlsPlaylistPath = path.join(filePath, m3u8File);
+        }
+      }
+      
+      return metadata;
     } catch (error) {
       console.error('Error getting file metadata:', error);
       throw error;
