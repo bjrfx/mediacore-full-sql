@@ -75,7 +75,7 @@ export default function AdminMedia() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [mediaToDelete, setMediaToDelete] = useState(null);
-  const [editForm, setEditForm] = useState({ title: '', subtitle: '' });
+  const [editForm, setEditForm] = useState({ title: '', subtitle: '', description: '' });
   const [subtitleMediaId, setSubtitleMediaId] = useState(null);
   const [subtitleMediaTitle, setSubtitleMediaTitle] = useState('');
   
@@ -150,7 +150,11 @@ export default function AdminMedia() {
 
   const handleEdit = (media) => {
     setEditingMedia(media);
-    setEditForm({ title: media.title, subtitle: media.subtitle || '' });
+    setEditForm({ 
+      title: media.title, 
+      subtitle: media.subtitle || '', 
+      description: media.description || '' 
+    });
     // Reset thumbnail state
     setNewThumbnailFile(null);
     setThumbnailPreview(null);
@@ -324,7 +328,7 @@ export default function AdminMedia() {
                       <div className="min-w-0">
                         <p className="font-medium truncate">{media.title}</p>
                         <p className="text-sm text-muted-foreground truncate">
-                          {media.subtitle || 'No description'}
+                          {media.description || media.subtitle || 'No description'}
                         </p>
                       </div>
                     </div>
@@ -497,9 +501,9 @@ export default function AdminMedia() {
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea
-                value={editForm.subtitle}
+                value={editForm.description}
                 onChange={(e) =>
-                  setEditForm((prev) => ({ ...prev, subtitle: e.target.value }))
+                  setEditForm((prev) => ({ ...prev, description: e.target.value }))
                 }
               />
             </div>

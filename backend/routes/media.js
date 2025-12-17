@@ -1341,6 +1341,7 @@ router.get('/admin/media', checkAdminAuth, async (req, res) => {
       id: item.id,
       title: item.title,
       subtitle: item.subtitle,
+      description: item.description,
       type: item.type,
       filePath: item.file_path,
       fileUrl: item.file_path,
@@ -1382,7 +1383,7 @@ router.get('/admin/media', checkAdminAuth, async (req, res) => {
 router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, subtitle, artistId, albumId } = req.body;
+    const { title, subtitle, description, artistId, albumId } = req.body;
     
     const media = await mediaDAO.getById(id);
     
@@ -1397,6 +1398,7 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
     const updateData = {};
     if (title !== undefined) updateData.title = title;
     if (subtitle !== undefined) updateData.subtitle = subtitle;
+    if (description !== undefined) updateData.description = description;
     if (artistId !== undefined) updateData.artistId = artistId;
     if (albumId !== undefined) updateData.albumId = albumId;
     
