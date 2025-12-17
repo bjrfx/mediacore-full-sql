@@ -1,5 +1,6 @@
 const express = require("express");
 const path = require("path");
+const sharp = require("sharp");
 
 const app = express();
 const BACKEND_API = process.env.BACKEND_API || "https://mediacoreapi-sql.masakalirestrobar.ca";
@@ -48,6 +49,79 @@ function genericOGHtml() {
 }
 
 // --------------------------------------------------
+// OG Image Generator - Creates 1200x630 images from thumbnails
+// --------------------------------------------------
+app.get("/og-image/:mediaId.jpg", async (req, res) => {
+  const { mediaId } = req.params;
+
+  try {
+    const backendUrl = `${BACKEND_API}/api/media/${mediaId}`;
+    const headers = API_KEY ? { "x-api-key": API_KEY } : {};
+
+    const backendResponse = await fetch(backendUrl, {
+      headers,
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!backendResponse.ok) {
+      // Serve fallback image
+      return res.redirect(301, `${APP_DOMAIN}/logo512.png`);
+    }
+
+    const mediaData = await backendResponse.json();
+    if (!mediaData.success || !mediaData.data) {
+      return res.redirect(301, `${APP_DOMAIN}/logo512.png`);
+    }
+
+    const media = mediaData.data;
+    const thumb = media.thumbnailUrl || media.thumbnail || media.thumbnail_path;
+
+    if (!thumb) {
+      return res.redirect(301, `${APP_DOMAIN}/logo512.png`);
+    }
+
+    // Build absolute thumbnail URL
+    let thumbnailUrl;
+    if (thumb.startsWith("http")) {
+      thumbnailUrl = thumb;
+    } else if (thumb.startsWith("/")) {
+      thumbnailUrl = `${BACKEND_API}${thumb}`;
+    } else {
+      thumbnailUrl = `${BACKEND_API}/${thumb}`;
+    }
+
+    log(`Generating OG image for ${mediaId} from ${thumbnailUrl}`, "og-image");
+
+    // Download the thumbnail
+    const imgResponse = await fetch(thumbnailUrl, {
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!imgResponse.ok) {
+      return res.redirect(301, `${APP_DOMAIN}/logo512.png`);
+    }
+
+    const buffer = Buffer.from(await imgResponse.arrayBuffer());
+
+    // Process image to 1200x630 with cover strategy (no distortion)
+    const processedImage = await sharp(buffer)
+      .resize(1200, 630, {
+        fit: "cover",
+        position: "center",
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    res.set("Content-Type", "image/jpeg");
+    res.set("Cache-Control", "public, max-age=86400, immutable");
+    res.send(processedImage);
+  } catch (error) {
+    log(`OG image error: ${error.message}`, "og-image");
+    res.redirect(301, `${APP_DOMAIN}/logo512.png`);
+  }
+});
+
+// --------------------------------------------------
 // OG route MUST be before static middleware
 // --------------------------------------------------
 app.get("/share/:mediaId", async (req, res) => {
@@ -86,19 +160,8 @@ app.get("/share/:mediaId", async (req, res) => {
       media.description ||
       `${isVideo ? "Watch" : "Listen to"} "${title}"${media.artist ? ` by ${media.artist}` : ""} on MediaCore`;
 
-    // Prefer backend-provided thumbnail fields; fall back to logo
-    const thumb = media.thumbnailUrl || media.thumbnail || media.thumbnail_path;
-    let image = `${APP_DOMAIN}/logo512.png`;
-
-    if (thumb) {
-      if (thumb.startsWith("http")) {
-        image = thumb;
-      } else if (thumb.startsWith("/")) {
-        image = `${APP_DOMAIN}${thumb}`;
-      } else {
-        image = `${APP_DOMAIN}/${thumb}`;
-      }
-    }
+    // Use dynamically generated 1200x630 OG image
+    const image = `${APP_DOMAIN}/og-image/${media.id}.jpg`;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
