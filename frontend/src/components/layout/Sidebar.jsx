@@ -119,7 +119,7 @@ function Sidebar() {
           >
             <span style={{ color: '#E5E7EB' }}>Media</span>
             <span style={{ color: '#E5E7EB' }}>Core</span>
-            <span style={{ color: '#8B5CF6' }}>.in</span>
+            <span style={{ color: '#8B5CF6' }}>.com</span>
           </motion.span>
         )}
         {isMobile && (
