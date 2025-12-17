@@ -1023,6 +1023,138 @@ function escapeHtml(text) {
   return (text || '').replace(/[&<>"']/g, m => map[m]);
 }
 
+// SOCIAL MEDIA CRAWLER DETECTION & OG TAG SERVING
+// ========================================
+// Middleware to detect social media crawlers and serve proper OG meta tags
+// for /listen/:id and /watch/:id URLs
+
+function isSocialMediaCrawler(userAgent) {
+  if (!userAgent) return false;
+  const crawlers = [
+    'facebookexternalhit',
+    'WhatsApp',
+    'Twitterbot',
+    'TelegramBot',
+    'LinkedInBot',
+    'Slackbot',
+    'Pinterest',
+    'Discordbot',
+    'SkypeUriPreview',
+    'outbrain',
+    'quora',
+    'rogerbot',
+    'showyoubot',
+    'vkShare',
+    'W3C_Validator'
+  ];
+  return crawlers.some(crawler => userAgent.toLowerCase().includes(crawler.toLowerCase()));
+}
+
+async function serveOGTags(req, res, next) {
+  const userAgent = req.headers['user-agent'] || '';
+  const path = req.path;
+  
+  // Check if this is a share URL (/listen/:id or /watch/:id)
+  const shareMatch = path.match(/^\/(listen|watch)\/([a-f0-9-]+)$/);
+  
+  if (shareMatch && isSocialMediaCrawler(userAgent)) {
+    const [, shareType, mediaId] = shareMatch;
+    console.log(`🤖 Social crawler detected: ${userAgent.substring(0, 50)}...`);
+    console.log(`📱 Serving OG tags for /${shareType}/${mediaId}`);
+    
+    try {
+      // Fetch media from database
+      const [media] = await db.query(
+        'SELECT id, title, description, type, file_path, thumbnail_path, artist, duration FROM media WHERE id = ?',
+        [mediaId]
+      );
+
+      if (!media || (typeof media === 'object' && Object.keys(media).length === 0)) {
+        console.log(`❌ Media not found for OG tags`);
+        return next(); // Let React handle it
+      }
+
+      const mediaData = media;
+      const isVideo = mediaData.type === 'video';
+      const appDomain = process.env.APP_DOMAIN || process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
+      
+      const pageUrl = `${appDomain}/${shareType}/${mediaData.id}`;
+      const title = `${mediaData.title}`;
+      const siteName = 'MediaCore';
+      const description = mediaData.description || 
+        `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}"${mediaData.artist ? ` by ${mediaData.artist}` : ''} on MediaCore`;
+      
+      // Handle thumbnail path - make it absolute URL
+      let image = `${appDomain}/logo512.png`;
+      if (mediaData.thumbnail_path) {
+        if (mediaData.thumbnail_path.startsWith('http')) {
+          image = mediaData.thumbnail_path;
+        } else if (mediaData.thumbnail_path.startsWith('/')) {
+          image = `${appDomain}${mediaData.thumbnail_path}`;
+        } else {
+          image = `${appDomain}/${mediaData.thumbnail_path}`;
+        }
+      }
+
+      console.log(`✅ Serving OG tags: "${title}"`);
+
+      // Generate HTML with proper OG tags
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  
+  <!-- Essential Open Graph Meta Tags -->
+  <meta property="og:url" content="${pageUrl}" />
+  <meta property="og:type" content="${isVideo ? 'video.other' : 'music.song'}" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+  <meta property="og:image:secure_url" content="${escapeHtml(image)}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${escapeHtml(title)}" />
+  <meta property="og:site_name" content="${siteName}" />
+  <meta property="og:locale" content="en_US" />
+  
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="${pageUrl}" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+  <meta name="twitter:image:alt" content="${escapeHtml(title)}" />
+  
+  <!-- Additional Meta Tags -->
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="${pageUrl}" />
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <p>${escapeHtml(description)}</p>
+  <p>This content is available on MediaCore.</p>
+</body>
+</html>`;
+
+      res.set('Content-Type', 'text/html; charset=utf-8');
+      res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+      return res.send(html);
+      
+    } catch (error) {
+      console.error('Error serving OG tags:', error);
+      return next(); // Continue to React app on error
+    }
+  }
+  
+  next(); // Not a crawler or not a share URL, continue to React app
+}
+
+// Apply OG middleware before serving React app
+app.use(serveOGTags);
+
 // Error handling
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Not Found' });
