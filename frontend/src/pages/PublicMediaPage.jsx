@@ -254,7 +254,7 @@ export default function PublicMediaPage() {
                 {/* Audio info on the side for desktop */}
                 <div className="flex-1 text-center md:text-left md:py-4">
                   <span className="text-xs font-medium text-primary uppercase tracking-wider">
-                    {media.type === 'audio' ? 'Song' : 'Track'}
+                    Track
                   </span>
                   <h1 className="text-3xl md:text-5xl font-bold mt-2 mb-4">
                     {media.title}

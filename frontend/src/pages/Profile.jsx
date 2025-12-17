@@ -395,7 +395,7 @@ export default function Profile() {
                 <Trophy className="h-5 w-5 text-yellow-500" />
                 Top Tracks
               </CardTitle>
-              <CardDescription>Your most played songs</CardDescription>
+              <CardDescription>Your most played tracks</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
