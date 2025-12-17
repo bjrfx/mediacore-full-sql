@@ -129,6 +129,12 @@ export default function ShareMenu({
     return `${APP_DOMAIN}/${type}/${media.id}`;
   }, [media]);
 
+  // Generate OG-optimized URL for social sharing (shows proper preview)
+  const getOGShareUrl = useCallback(() => {
+    if (!media) return '';
+    return `${APP_DOMAIN}/api/og/${media.id}`;
+  }, [media]);
+
   const getEmbedUrl = useCallback(() => {
     if (!media) return '';
     return `${APP_DOMAIN}/embed/${media.id}`;
@@ -182,7 +188,7 @@ export default function ShareMenu({
         </svg>
       ),
       color: '#25D366',
-      getUrl: () => `https://wa.me/?text=${encodeURIComponent(`Check out "${media?.title}" on MediaCore: ${getShareUrl()}`)}`,
+      getUrl: () => `https://wa.me/?text=${encodeURIComponent(`Check out "${media?.title}" on MediaCore: ${getOGShareUrl()}`)}`,
     },
     {
       name: 'Telegram',
@@ -192,7 +198,7 @@ export default function ShareMenu({
         </svg>
       ),
       color: '#0088cc',
-      getUrl: () => `https://t.me/share/url?url=${encodeURIComponent(getShareUrl())}&text=${encodeURIComponent(`Check out "${media?.title}" on MediaCore`)}`,
+      getUrl: () => `https://t.me/share/url?url=${encodeURIComponent(getOGShareUrl())}&text=${encodeURIComponent(`Check out "${media?.title}" on MediaCore`)}`,
     },
     {
       name: 'X',
@@ -202,13 +208,13 @@ export default function ShareMenu({
         </svg>
       ),
       color: '#000',
-      getUrl: () => `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${media?.title}" on MediaCore`)}&url=${encodeURIComponent(getShareUrl())}`,
+      getUrl: () => `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${media?.title}" on MediaCore`)}&url=${encodeURIComponent(getOGShareUrl())}`,
     },
     {
       name: 'Email',
       icon: Mail,
       color: '#EA4335',
-      getUrl: () => `mailto:?subject=${encodeURIComponent(`Check out "${media?.title}" on MediaCore`)}&body=${encodeURIComponent(`I thought you might enjoy this: ${getShareUrl()}`)}`,
+      getUrl: () => `mailto:?subject=${encodeURIComponent(`Check out "${media?.title}" on MediaCore`)}&body=${encodeURIComponent(`I thought you might enjoy this: ${getOGShareUrl()}`)}`,
     },
   ];
 

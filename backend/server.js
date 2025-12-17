@@ -916,6 +916,114 @@ app.post('/admin/system/settings', checkAdminAuth, (req, res) => {
   });
 });
 
+// ========================================
+// SOCIAL MEDIA META TAGS ENDPOINT
+// ========================================
+// Serves HTML with proper Open Graph meta tags for social sharing
+app.get('/api/og/:mediaId', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const API_KEY = req.headers['x-api-key'];
+
+    // Check API key for security
+    if (!API_KEY) {
+      return res.status(401).json({ error: 'Missing x-api-key header' });
+    }
+
+    // Fetch media from database
+    const [media] = await db.query(
+      'SELECT id, title, description, type, file_path, thumbnail, artist_name, duration FROM media WHERE id = ?',
+      [mediaId]
+    );
+
+    if (!media || media.length === 0) {
+      // Return generic OG tags if media not found
+      return res.send(generateGenericOGHTML());
+    }
+
+    const mediaData = media[0];
+    const isVideo = mediaData.type === 'video';
+    const shareType = isVideo ? 'watch' : 'listen';
+    const appDomain = process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
+    
+    const pageUrl = `${appDomain}/${shareType}/${mediaData.id}`;
+    const title = `${mediaData.title} - MediaCore`;
+    const description = mediaData.description || 
+      `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}" by ${mediaData.artist_name || 'Unknown'} on MediaCore`;
+    const image = mediaData.thumbnail || `${appDomain}/logo512.png`;
+
+    // Generate HTML with meta tags
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="${escapeHtml(description)}">
+  
+  <!-- Open Graph Meta Tags -->
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:type" content="${isVideo ? 'video.other' : 'music.song'}" />
+  <meta property="og:url" content="${pageUrl}" />
+  <meta property="og:site_name" content="MediaCore" />
+  
+  <!-- Twitter Card Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+  
+  <title>${escapeHtml(title)}</title>
+  <script>
+    // Redirect to actual app
+    window.location.href = '${pageUrl}';
+  </script>
+</head>
+<body>
+  <p>Redirecting to MediaCore...</p>
+</body>
+</html>`;
+
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } catch (error) {
+    console.error('Error generating OG tags:', error);
+    res.send(generateGenericOGHTML());
+  }
+});
+
+// Helper functions for OG tag generation
+function generateGenericOGHTML() {
+  const appDomain = process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta property="og:title" content="MediaCore - Premium Audio & Video Streaming" />
+  <meta property="og:description" content="Discover and stream premium audio and video content" />
+  <meta property="og:image" content="${appDomain}/logo512.png" />
+  <meta property="og:type" content="website" />
+  <title>MediaCore</title>
+  <script>window.location.href = '${appDomain}';</script>
+</head>
+<body></body>
+</html>`;
+}
+
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return (text || '').replace(/[&<>"']/g, m => map[m]);
+}
+
 // Error handling
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Not Found' });
