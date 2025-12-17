@@ -1026,6 +1026,102 @@ app.get('/og/:mediaId', async (req, res) => {
   }
 });
 
+// API OG ENDPOINT (Passenger-safe)
+// ========================================
+// Same as /og but under /api to ensure Phusion Passenger forwards to Node
+app.get('/api/og/:mediaId', async (req, res) => {
+  try {
+    const { mediaId } = req.params;
+    const userAgent = req.headers['user-agent'] || '';
+
+    console.log(`🔍 API OG Request for media: ${mediaId}`);
+    console.log(`📱 UA: ${userAgent.substring(0, 100)}`);
+
+    const [media] = await db.query(
+      'SELECT id, title, description, type, file_path, thumbnail_path, artist, duration FROM media WHERE id = ?',
+      [mediaId]
+    );
+
+    if (!media || (typeof media === 'object' && Object.keys(media).length === 0)) {
+      console.log('❌ Media not found for API OG');
+      return res.send(generateGenericOGHTML());
+    }
+
+    const mediaData = media;
+    const isVideo = mediaData.type === 'video';
+    const shareType = isVideo ? 'watch' : 'listen';
+    const appDomain = process.env.APP_DOMAIN || process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
+
+    const pageUrl = `${appDomain}/${shareType}/${mediaData.id}`;
+    const title = `${mediaData.title}`;
+    const description = mediaData.description || `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}"${mediaData.artist ? ` by ${mediaData.artist}` : ''} on MediaCore`;
+
+    let image = `${appDomain}/logo512.png`;
+    if (mediaData.thumbnail_path) {
+      if (mediaData.thumbnail_path.startsWith('http')) {
+        image = mediaData.thumbnail_path;
+      } else if (mediaData.thumbnail_path.startsWith('/')) {
+        image = `${appDomain}${mediaData.thumbnail_path}`;
+      } else {
+        image = `${appDomain}/${mediaData.thumbnail_path}`;
+      }
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:url" content="${pageUrl}" />
+  <meta property="og:type" content="${isVideo ? 'video.other' : 'music.song'}" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+  <meta property="og:image:secure_url" content="${escapeHtml(image)}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="${escapeHtml(title)}" />
+  <meta property="og:site_name" content="MediaCore" />
+  <meta property="og:locale" content="en_US" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:url" content="${pageUrl}" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+  <meta name="twitter:image:alt" content="${escapeHtml(title)}" />
+
+  <link rel="canonical" href="${pageUrl}" />
+
+  <script>
+    if (navigator.userAgent.toLowerCase().match(/(facebookexternalhit|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|pinterest|discordbot|skypeuripreview)/)) {
+      // Crawler: serve meta only
+    } else {
+      window.location.href = '${pageUrl}';
+    }
+  </script>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <p>${escapeHtml(description)}</p>
+  <p>Redirecting to MediaCore...</p>
+</body>
+</html>`;
+
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(html);
+  } catch (error) {
+    console.error('Error generating API OG tags:', error);
+    res.send(generateGenericOGHTML());
+  }
+});
+
 // Helper functions for OG tag generation
 function generateGenericOGHTML() {
   const appDomain = process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
@@ -1069,13 +1165,5 @@ app.use((err, req, res, next) => {
 db.query('SELECT 1').then(() => console.log('✅ MySQL connected')).catch(err => console.error('❌ MySQL failed:', err.message));
 
 console.log('📦 MediaCore API loaded');
-
-// Start server
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ MediaCore API Server listening on http://0.0.0.0:${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`   Database: ${process.env.DB_NAME || 'mediacore'}`);
-});
 
 module.exports = app;
