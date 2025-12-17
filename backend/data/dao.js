@@ -48,21 +48,23 @@ const mediaDAO = {
   // Create media
   async create(mediaData) {
     const result = await db.query(
-      `INSERT INTO media (id, title, subtitle, type, url, thumbnail_url, duration, 
-       artist_id, album_id, language, content_group_id, created_at, updated_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      `INSERT INTO media (id, title, artist_id, album_id, type, file_path, thumbnail_path, 
+       duration, file_size, language, content_group_id, is_hls, hls_playlist_url, created_at, updated_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
       [
         mediaData.id || require('uuid').v4(),
         mediaData.title,
-        mediaData.subtitle || null,
-        mediaData.type,
-        mediaData.url,
-        mediaData.thumbnail_url || null,
-        mediaData.duration || null,
         mediaData.artist_id || null,
         mediaData.album_id || null,
+        mediaData.type,
+        mediaData.url || mediaData.file_path || null, // Support both url and file_path
+        mediaData.thumbnail_url || mediaData.thumbnail_path || null, // Support both naming conventions
+        mediaData.duration || null,
+        mediaData.file_size || null,
         mediaData.language || 'en',
-        mediaData.content_group_id || null
+        mediaData.content_group_id || null,
+        mediaData.is_hls || false,
+        mediaData.hls_playlist_url || null
       ]
     );
     return result.insertId;
