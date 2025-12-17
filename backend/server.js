@@ -1,4 +1,3 @@
-@ -1,1174 +1,1074 @@
 /**
  * MediaCore API Server - MySQL Edition
  */
@@ -918,52 +917,37 @@ app.post('/admin/system/settings', checkAdminAuth, (req, res) => {
 });
 
 // ========================================
-// SOCIAL MEDIA META TAGS ENDPOINT
 // PUBLIC OG ENDPOINT FOR SOCIAL SHARING
 // ========================================
-// Serves HTML with proper Open Graph meta tags for social sharing
-app.get('/api/og/:mediaId', async (req, res) => {
 // Serves dynamic Open Graph tags for /listen/:id and /watch/:id
 // This endpoint is accessible at /og/:mediaId and accessed via redirects in ShareMenu
 app.get('/og/:mediaId', async (req, res) => {
   try {
     const { mediaId } = req.params;
-    console.log(`🔍 OG Request for media ID: ${mediaId}`);
     const userAgent = req.headers['user-agent'] || '';
     
     console.log(`🔍 OG Request for media: ${mediaId}`);
     console.log(`📱 User-Agent: ${userAgent.substring(0, 100)}`);
 
-    // Fetch media from database (public endpoint - no API key required for social crawlers)
     // Fetch media from database
     const [media] = await db.query(
       'SELECT id, title, description, type, file_path, thumbnail_path, artist, duration FROM media WHERE id = ?',
       [mediaId]
     );
 
-    console.log(`📊 Query result:`, media);
-
-    // media is the rows object from db.query, check if it's empty
     if (!media || (typeof media === 'object' && Object.keys(media).length === 0)) {
-      // Return generic OG tags if media not found
-      console.log(`❌ Media not found, returning generic OG tags`);
       console.log(`❌ Media not found`);
       return res.send(generateGenericOGHTML());
     }
 
-    const mediaData = media;  // media is already the first row
     const mediaData = media;
     const isVideo = mediaData.type === 'video';
     const shareType = isVideo ? 'watch' : 'listen';
-    const appDomain = process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
     const appDomain = process.env.APP_DOMAIN || process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
     
     const pageUrl = `${appDomain}/${shareType}/${mediaData.id}`;
-    const title = `${mediaData.title} - MediaCore`;
     const title = `${mediaData.title}`;
     const description = mediaData.description || 
-      `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}" by ${mediaData.artist || 'Unknown'} on MediaCore`;
-    const image = mediaData.thumbnail_path || `${appDomain}/logo512.png`;
       `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}"${mediaData.artist ? ` by ${mediaData.artist}` : ''} on MediaCore`;
     
     // Ensure thumbnail is absolute URL
@@ -978,7 +962,6 @@ app.get('/og/:mediaId', async (req, res) => {
       }
     }
 
-    // Generate HTML with meta tags
     console.log(`✅ Serving OG for: "${title}"`);
     console.log(`   Image: ${image}`);
 
@@ -992,7 +975,6 @@ app.get('/og/:mediaId', async (req, res) => {
   <meta name="description" content="${escapeHtml(description)}">
   <meta name="robots" content="index, follow">
   
-  <!-- Open Graph Meta Tags -->
   <!-- Essential Open Graph Meta Tags -->
   <meta property="og:url" content="${pageUrl}" />
   <meta property="og:type" content="${isVideo ? 'video.other' : 'music.song'}" />
@@ -1003,8 +985,6 @@ app.get('/og/:mediaId', async (req, res) => {
   <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:type" content="${isVideo ? 'video.other' : 'music.song'}" />
-  <meta property="og:url" content="${pageUrl}" />
   <meta property="og:image:alt" content="${escapeHtml(title)}" />
   <meta property="og:site_name" content="MediaCore" />
   <meta property="og:locale" content="en_US" />
@@ -1017,14 +997,11 @@ app.get('/og/:mediaId', async (req, res) => {
   <meta name="twitter:image" content="${escapeHtml(image)}" />
   <meta name="twitter:image:alt" content="${escapeHtml(title)}" />
   
-  <title>${escapeHtml(title)}</title>
   <!-- Canonical URL -->
   <link rel="canonical" href="${pageUrl}" />
   
   <!-- Redirect to actual app -->
   <script>
-    // Redirect to actual app
-    window.location.href = '${pageUrl}';
     if (navigator.userAgent.toLowerCase().match(/(facebookexternalhit|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|pinterest|discordbot|skypeuripreview)/)) {
       // This is a crawler - serve the meta tags
     } else {
@@ -1078,138 +1055,6 @@ function escapeHtml(text) {
   return (text || '').replace(/[&<>"']/g, m => map[m]);
 }
 
-// SOCIAL MEDIA CRAWLER DETECTION & OG TAG SERVING
-// ========================================
-// Middleware to detect social media crawlers and serve proper OG meta tags
-// for /listen/:id and /watch/:id URLs
-
-function isSocialMediaCrawler(userAgent) {
-  if (!userAgent) return false;
-  const crawlers = [
-    'facebookexternalhit',
-    'WhatsApp',
-    'Twitterbot',
-    'TelegramBot',
-    'LinkedInBot',
-    'Slackbot',
-    'Pinterest',
-    'Discordbot',
-    'SkypeUriPreview',
-    'outbrain',
-    'quora',
-    'rogerbot',
-    'showyoubot',
-    'vkShare',
-    'W3C_Validator'
-  ];
-  return crawlers.some(crawler => userAgent.toLowerCase().includes(crawler.toLowerCase()));
-}
-
-async function serveOGTags(req, res, next) {
-  const userAgent = req.headers['user-agent'] || '';
-  const path = req.path;
-  
-  // Check if this is a share URL (/listen/:id or /watch/:id)
-  const shareMatch = path.match(/^\/(listen|watch)\/([a-f0-9-]+)$/);
-  
-  if (shareMatch && isSocialMediaCrawler(userAgent)) {
-    const [, shareType, mediaId] = shareMatch;
-    console.log(`🤖 Social crawler detected: ${userAgent.substring(0, 50)}...`);
-    console.log(`📱 Serving OG tags for /${shareType}/${mediaId}`);
-    
-    try {
-      // Fetch media from database
-      const [media] = await db.query(
-        'SELECT id, title, description, type, file_path, thumbnail_path, artist, duration FROM media WHERE id = ?',
-        [mediaId]
-      );
-
-      if (!media || (typeof media === 'object' && Object.keys(media).length === 0)) {
-        console.log(`❌ Media not found for OG tags`);
-        return next(); // Let React handle it
-      }
-
-      const mediaData = media;
-      const isVideo = mediaData.type === 'video';
-      const appDomain = process.env.APP_DOMAIN || process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
-      
-      const pageUrl = `${appDomain}/${shareType}/${mediaData.id}`;
-      const title = `${mediaData.title}`;
-      const siteName = 'MediaCore';
-      const description = mediaData.description || 
-        `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}"${mediaData.artist ? ` by ${mediaData.artist}` : ''} on MediaCore`;
-      
-      // Handle thumbnail path - make it absolute URL
-      let image = `${appDomain}/logo512.png`;
-      if (mediaData.thumbnail_path) {
-        if (mediaData.thumbnail_path.startsWith('http')) {
-          image = mediaData.thumbnail_path;
-        } else if (mediaData.thumbnail_path.startsWith('/')) {
-          image = `${appDomain}${mediaData.thumbnail_path}`;
-        } else {
-          image = `${appDomain}/${mediaData.thumbnail_path}`;
-        }
-      }
-
-      console.log(`✅ Serving OG tags: "${title}"`);
-
-      // Generate HTML with proper OG tags
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)}</title>
-  <meta name="description" content="${escapeHtml(description)}">
-  
-  <!-- Essential Open Graph Meta Tags -->
-  <meta property="og:url" content="${pageUrl}" />
-  <meta property="og:type" content="${isVideo ? 'video.other' : 'music.song'}" />
-  <meta property="og:title" content="${escapeHtml(title)}" />
-  <meta property="og:description" content="${escapeHtml(description)}" />
-  <meta property="og:image" content="${escapeHtml(image)}" />
-  <meta property="og:image:secure_url" content="${escapeHtml(image)}" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="${escapeHtml(title)}" />
-  <meta property="og:site_name" content="${siteName}" />
-  <meta property="og:locale" content="en_US" />
-  
-  <!-- Twitter Card Meta Tags -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:url" content="${pageUrl}" />
-  <meta name="twitter:title" content="${escapeHtml(title)}" />
-  <meta name="twitter:description" content="${escapeHtml(description)}" />
-  <meta name="twitter:image" content="${escapeHtml(image)}" />
-  <meta name="twitter:image:alt" content="${escapeHtml(title)}" />
-  
-  <!-- Additional Meta Tags -->
-  <meta name="robots" content="index, follow" />
-  <link rel="canonical" href="${pageUrl}" />
-</head>
-<body>
-  <h1>${escapeHtml(title)}</h1>
-  <p>${escapeHtml(description)}</p>
-  <p>This content is available on MediaCore.</p>
-</body>
-</html>`;
-
-      res.set('Content-Type', 'text/html; charset=utf-8');
-      res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-      return res.send(html);
-      
-    } catch (error) {
-      console.error('Error serving OG tags:', error);
-      return next(); // Continue to React app on error
-    }
-  }
-  
-  next(); // Not a crawler or not a share URL, continue to React app
-}
-
-// Apply OG middleware before serving React app
-app.use(serveOGTags);
-
 // Error handling
 app.use((req, res) => {
   res.status(404).json({ success: false, error: 'Not Found' });
@@ -1224,5 +1069,13 @@ app.use((err, req, res, next) => {
 db.query('SELECT 1').then(() => console.log('✅ MySQL connected')).catch(err => console.error('❌ MySQL failed:', err.message));
 
 console.log('📦 MediaCore API loaded');
+
+// Start server
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ MediaCore API Server listening on http://0.0.0.0:${PORT}`);
+  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`   Database: ${process.env.DB_NAME || 'mediacore'}`);
+});
 
 module.exports = app;
