@@ -285,17 +285,37 @@ router.post('/api/files/upload', checkAdminAuth, upload.array('files', 50), asyn
     
     console.log('[FILE UPLOAD] targetDir:', targetDir, 'isHLSFolder:', isHLSFolder);
     
+    // Helper function to check if ZIP contains HLS content
+    const checkIfHLSZip = async (zipPath) => {
+      try {
+        const directory = await unzipper.Open.file(zipPath);
+        const hasM3U8 = directory.files.some(f => f.path.endsWith('.m3u8'));
+        const hasTS = directory.files.some(f => f.path.endsWith('.ts'));
+        return hasM3U8 && hasTS;
+      } catch (err) {
+        console.error('[ZIP CHECK] Error checking ZIP contents:', err);
+        return false;
+      }
+    };
+    
     // Process each file
     for (const file of req.files) {
       const relativePath = path.relative(UPLOAD_DIR, file.path);
       const fileType = fileStorage.detectFileType(file.originalname, file.mimetype);
       const isZip = path.extname(file.originalname).toLowerCase() === '.zip';
       
-      console.log('[FILE UPLOAD] File:', file.originalname, 'isZip:', isZip, 'isHLSFolder:', isHLSFolder);
+      // Check if ZIP contains HLS content (async check)
+      let isHLSZip = false;
+      if (isZip) {
+        isHLSZip = await checkIfHLSZip(file.path);
+        console.log('[FILE UPLOAD] File:', file.originalname, 'isZip:', isZip, 'isHLSZip:', isHLSZip, 'isHLSFolder:', isHLSFolder);
+      } else {
+        console.log('[FILE UPLOAD] File:', file.originalname, 'isZip:', isZip);
+      }
       
-      // Auto-extract zip files in HLS folder
-      if (isZip && isHLSFolder) {
-        console.log('[ZIP EXTRACT] Starting extraction for:', file.originalname);
+      // Auto-extract zip files if in HLS folder OR if ZIP contains HLS content
+      if (isZip && (isHLSFolder || isHLSZip)) {
+        console.log('[ZIP EXTRACT] Starting extraction for:', file.originalname, 'Reason:', isHLSFolder ? 'HLS folder' : 'HLS content detected');
         try {
           const zipPath = file.path;
           const extractFolderName = path.basename(file.originalname, '.zip');
