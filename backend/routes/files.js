@@ -283,14 +283,19 @@ router.post('/api/files/upload', checkAdminAuth, upload.array('files', 50), asyn
     const isHLSFolder = targetDir.includes('hls');
     const uploadedFiles = [];
     
+    console.log('[FILE UPLOAD] targetDir:', targetDir, 'isHLSFolder:', isHLSFolder);
+    
     // Process each file
     for (const file of req.files) {
       const relativePath = path.relative(UPLOAD_DIR, file.path);
       const fileType = fileStorage.detectFileType(file.originalname, file.mimetype);
       const isZip = path.extname(file.originalname).toLowerCase() === '.zip';
       
+      console.log('[FILE UPLOAD] File:', file.originalname, 'isZip:', isZip, 'isHLSFolder:', isHLSFolder);
+      
       // Auto-extract zip files in HLS folder
       if (isZip && isHLSFolder) {
+        console.log('[ZIP EXTRACT] Starting extraction for:', file.originalname);
         try {
           const zipPath = file.path;
           const extractFolderName = path.basename(file.originalname, '.zip');
@@ -309,6 +314,8 @@ router.post('/api/files/upload', checkAdminAuth, upload.array('files', 50), asyn
           // Delete zip after extraction
           fs.unlinkSync(zipPath);
           
+          console.log('[ZIP EXTRACT] Success! Extracted to:', extractPath);
+          
           // Add extracted folder to response
           const extractedRelPath = path.relative(UPLOAD_DIR, extractPath);
           uploadedFiles.push({
@@ -322,7 +329,7 @@ router.post('/api/files/upload', checkAdminAuth, upload.array('files', 50), asyn
             message: 'ZIP extracted successfully'
           });
         } catch (extractError) {
-          console.error('Error extracting zip:', extractError);
+          console.error('[ZIP EXTRACT] Error extracting zip:', file.originalname, extractError);
           // If extraction fails, keep the zip file
           uploadedFiles.push({
             name: file.filename,

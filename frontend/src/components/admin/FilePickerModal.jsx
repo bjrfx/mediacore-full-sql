@@ -126,13 +126,12 @@ export function FilePickerModal({
   });
 
   const toggleFileSelection = (file) => {
-    // Allow selecting HLS folders (or folders when looking for HLS content)
-    const canSelectFolder = file.isDirectory && 
-      (file.type === 'hls' || filterType === 'hls' || 
-       (allowedTypes && allowedTypes.includes('hls')));
+    // Only allow selecting folders that are actual HLS content (type='hls')
+    // Don't select regular folders even when filtering for HLS
+    const canSelectFolder = file.isDirectory && file.type === 'hls';
     
     if (file.isDirectory && !canSelectFolder) {
-      // Navigate into non-HLS folders
+      // Navigate into non-HLS folders (including parent 'hls' directory)
       setCurrentPath(file.path);
       return;
     }
@@ -258,9 +257,8 @@ export function FilePickerModal({
               {filteredFiles.map((file) => {
                 const Icon = getFileIcon(file.type);
                 const isSelected = selectedFiles.find(f => f.id === file.id);
-                const canSelectFolder = file.isDirectory && 
-                  (file.type === 'hls' || filterType === 'hls' || 
-                   (allowedTypes && allowedTypes.includes('hls')));
+                // Only HLS content folders (type='hls') can be selected
+                const canSelectFolder = file.isDirectory && file.type === 'hls';
 
                 return (
                   <div

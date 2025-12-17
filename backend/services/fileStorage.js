@@ -194,12 +194,16 @@ class FileStorageService {
           // Count items in folder
           const subEntries = await fs.readdir(fullPath);
           
+          // Check if this is an HLS directory (contains .m3u8 playlist)
+          const hasM3U8 = subEntries.some(file => file.endsWith('.m3u8'));
+          const isHLSFolder = hasM3U8 || relativePath.startsWith('hls/') && subEntries.length > 0;
+          
           contents.push({
             id: relativePath,
             name: entry.name,
             path: relativePath,
             fullPath: fullPath,
-            type: 'folder',
+            type: isHLSFolder && hasM3U8 ? 'hls' : 'folder',
             isDirectory: true,
             size: 0,
             itemCount: subEntries.length,
