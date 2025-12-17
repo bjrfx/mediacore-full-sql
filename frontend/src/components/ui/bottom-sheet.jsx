@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence, useDragControls } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -11,13 +12,20 @@ import { cn } from "../../lib/utils";
 const BottomSheetContext = React.createContext({});
 
 const BottomSheet = ({ children, open, onOpenChange }) => {
-  return (
+  if (!open) return null;
+
+  const sheet = (
     <BottomSheetContext.Provider value={{ open, onOpenChange }}>
-      <AnimatePresence>
-        {open && children}
-      </AnimatePresence>
+      <AnimatePresence>{open && children}</AnimatePresence>
     </BottomSheetContext.Provider>
   );
+
+  // Render in a portal so the sheet isn't constrained by parent stacking contexts
+  if (typeof document !== "undefined") {
+    return createPortal(sheet, document.body);
+  }
+
+  return sheet;
 };
 
 const BottomSheetOverlay = React.forwardRef(({ className, ...props }, ref) => {
@@ -32,7 +40,8 @@ const BottomSheetOverlay = React.forwardRef(({ className, ...props }, ref) => {
       transition={{ duration: 0.2 }}
       onClick={() => onOpenChange?.(false)}
       className={cn(
-        "fixed inset-0 z-50 bg-black/60 backdrop-blur-sm",
+        "fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm",
+        "pointer-events-auto",
         className
       )}
       {...props}
@@ -57,7 +66,7 @@ const BottomSheetContent = React.forwardRef(
     return (
       <>
         <BottomSheetOverlay />
-        <div ref={constraintsRef} className="fixed inset-0 z-50 pointer-events-none" />
+        <div ref={constraintsRef} className="fixed inset-0 pointer-events-none" />
         <motion.div
           ref={ref}
           initial={{ y: "100%" }}
@@ -75,9 +84,10 @@ const BottomSheetContent = React.forwardRef(
           dragElastic={{ top: 0, bottom: 0.5 }}
           onDragEnd={handleDragEnd}
           className={cn(
-            "fixed inset-x-0 bottom-0 z-50 max-h-[90vh] rounded-t-2xl",
+            "fixed inset-x-0 bottom-0 z-[9999] rounded-t-2xl",
             "bg-card border-t border-border shadow-2xl",
-            "pointer-events-auto",
+            "pointer-events-auto flex flex-col",
+            "max-h-[85vh]",
             className
           )}
           {...props}
@@ -85,15 +95,15 @@ const BottomSheetContent = React.forwardRef(
           {/* Drag handle */}
           {showHandle && (
             <div 
-              className="flex justify-center py-4 cursor-grab active:cursor-grabbing"
+              className="flex justify-center py-3 cursor-grab active:cursor-grabbing flex-shrink-0"
               onPointerDown={(e) => dragControls.start(e)}
             >
-              <div className="w-12 h-1.5 rounded-full bg-muted-foreground/30" />
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/40" />
             </div>
           )}
           
-          {/* Content */}
-          <div className="overflow-y-auto max-h-[calc(90vh-56px)] pb-safe">
+          {/* Content - scrollable */}
+          <div className="flex-1 overflow-y-auto overscroll-contain pb-6" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
             {children}
           </div>
         </motion.div>
@@ -176,7 +186,7 @@ const BottomSheetAction = React.forwardRef(
     <button
       ref={ref}
       className={cn(
-        "w-full flex items-center gap-4 px-6 py-4",
+        "w-full flex items-center gap-3 px-4 py-3",
         "text-left transition-colors",
         "hover:bg-muted/50 active:bg-muted",
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",

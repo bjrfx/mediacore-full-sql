@@ -98,6 +98,30 @@ export default function ShareMenu({
     }
   }, [open, initialView]);
 
+  // Pause playback when opening the menu (do not auto-play while menu is open)
+  useEffect(() => {
+    if (open && isPlaying) {
+      togglePlay();
+    }
+  }, [open, isPlaying, togglePlay]);
+
+  // Hide navbar and mini-player on mobile when menu is open
+  useEffect(() => {
+    if (isMobile && open && showActions) {
+      // Hide navbar and mini-player for entire menu session
+      document.body.style.overflow = 'hidden';
+      const navbar = document.querySelector('[data-component="bottom-navbar"]');
+      const miniPlayer = document.querySelector('[data-component="mini-player"]');
+      if (navbar) navbar.style.display = 'none';
+      if (miniPlayer) miniPlayer.style.display = 'none';
+      return () => {
+        document.body.style.overflow = '';
+        if (navbar) navbar.style.display = '';
+        if (miniPlayer) miniPlayer.style.display = '';
+      };
+    }
+  }, [isMobile, open, showActions]);
+
   // Generate URLs
   const getShareUrl = useCallback(() => {
     if (!media) return '';
@@ -223,10 +247,10 @@ export default function ShareMenu({
 
   // Content for actions menu
   const ActionsContent = () => (
-    <>
+    <div className="flex flex-col">
       {/* Media info header */}
-      <div className="flex items-center gap-4 px-6 py-4 bg-muted/30">
-        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 flex-shrink-0">
+        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0">
           {media.thumbnail ? (
             <img 
               src={media.thumbnail} 
@@ -235,20 +259,20 @@ export default function ShareMenu({
             />
           ) : (
             <div className="w-full h-full bg-muted flex items-center justify-center">
-              <Play className="h-6 w-6 text-muted-foreground" />
+              <Play className="h-5 w-5 text-muted-foreground" />
             </div>
           )}
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm line-clamp-2">{media.title}</h3>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-0.5">
             {media.artistName || media.subtitle || 'Unknown artist'}
           </p>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="py-2">
+      <div className="py-1">
         <BottomSheetAction 
           icon={isCurrentTrack && isPlaying ? () => <span className="w-5 h-5 flex items-center justify-center"><span className="flex gap-0.5"><span className="audio-bar-mini" style={{animationDelay: '0s'}} /><span className="audio-bar-mini" style={{animationDelay: '0.1s'}} /><span className="audio-bar-mini" style={{animationDelay: '0.2s'}} /></span></span> : Play} 
           onClick={handlePlay}
@@ -286,19 +310,19 @@ export default function ShareMenu({
           Share
         </BottomSheetAction>
       </div>
-    </>
+    </div>
   );
 
   // Content for share menu
   const ShareContent = () => (
-    <>
+    <div className="flex flex-col">
       {/* Back button on mobile */}
       {showActions && (
-        <div className="px-6 py-2">
+        <div className="px-4 py-2 flex-shrink-0">
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground"
+            className="text-muted-foreground -ml-2"
             onClick={() => setView('actions')}
           >
             ← Back
@@ -307,8 +331,8 @@ export default function ShareMenu({
       )}
 
       {/* Media preview */}
-      <div className="flex items-center gap-4 px-6 py-4 bg-muted/30">
-        <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 bg-muted/30 flex-shrink-0">
+        <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0">
           {media.thumbnail ? (
             <img 
               src={media.thumbnail} 
@@ -317,105 +341,106 @@ export default function ShareMenu({
             />
           ) : (
             <div className="w-full h-full bg-muted flex items-center justify-center">
-              <Play className="h-6 w-6 text-muted-foreground" />
+              <Play className="h-5 w-5 text-muted-foreground" />
             </div>
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm line-clamp-2">{media.title}</h3>
-          <p className="text-xs text-muted-foreground mt-1">{getShareUrl()}</p>
+          <h3 className="font-semibold text-sm line-clamp-1">{media.title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">{getShareUrl()}</p>
         </div>
       </div>
 
       {/* Share actions */}
-      <div className="px-6 py-4 space-y-4">
+      <div className="px-4 py-3 space-y-3">
         {/* Native Share (if supported) */}
         {typeof navigator !== 'undefined' && navigator.share && (
           <Button 
             onClick={handleNativeShare}
             className="w-full"
-            size="lg"
+            size="default"
           >
-            <Share2 className="mr-2 h-5 w-5" />
+            <Share2 className="mr-2 h-4 w-4" />
             Share
           </Button>
         )}
 
         {/* Copy Link */}
         <div className="flex gap-2">
-          <div className="flex-1 bg-muted/50 rounded-lg px-4 py-3 text-sm truncate">
+          <div className="flex-1 bg-muted/50 rounded-lg px-3 py-2.5 text-sm truncate min-w-0">
             {getShareUrl()}
           </div>
           <Button 
             variant="secondary"
             size="icon"
-            className="h-12 w-12"
+            className="h-10 w-10 flex-shrink-0"
             onClick={() => copyToClipboard(getShareUrl(), 'link')}
           >
             {copied === 'link' ? (
-              <Check className="h-5 w-5 text-green-500" />
+              <Check className="h-4 w-4 text-green-500" />
             ) : (
-              <Copy className="h-5 w-5" />
+              <Copy className="h-4 w-4" />
             )}
           </Button>
         </div>
 
-        {/* Social sharing */}
-        <div className="flex justify-center gap-3">
+        {/* Social sharing - responsive grid */}
+        <div className="grid grid-cols-4 gap-2">
           {socialLinks.map((social) => (
             <a
               key={social.name}
               href={social.getUrl()}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-muted/50 transition-colors"
+              className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-muted/50 transition-colors"
               title={`Share on ${social.name}`}
             >
               <div 
-                className="w-12 h-12 rounded-full flex items-center justify-center text-white"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white"
                 style={{ backgroundColor: social.color }}
               >
                 {typeof social.icon === 'function' ? (
                   <social.icon />
                 ) : (
-                  <social.icon className="h-5 w-5" />
+                  <social.icon className="h-4 w-4" />
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">{social.name}</span>
+              <span className="text-[10px] text-muted-foreground">{social.name}</span>
             </a>
           ))}
         </div>
 
-        <BottomSheetSeparator />
+        <div className="h-px bg-border my-2" />
 
-        {/* Embed code */}
+        {/* Embed code - with proper wrapping */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Embed Code</span>
             <Button
               variant="ghost"
               size="sm"
+              className="h-8 px-2"
               onClick={() => copyToClipboard(getEmbedCode(), 'embed')}
             >
               {copied === 'embed' ? (
                 <>
-                  <Check className="mr-2 h-4 w-4 text-green-500" />
-                  Copied!
+                  <Check className="mr-1.5 h-3.5 w-3.5 text-green-500" />
+                  <span className="text-xs">Copied!</span>
                 </>
               ) : (
                 <>
-                  <Code2 className="mr-2 h-4 w-4" />
-                  Copy Embed
+                  <Code2 className="mr-1.5 h-3.5 w-3.5" />
+                  <span className="text-xs">Copy</span>
                 </>
               )}
             </Button>
           </div>
-          <div className="bg-muted/50 rounded-lg p-3 text-xs font-mono text-muted-foreground overflow-x-auto whitespace-nowrap">
+          <div className="bg-muted/50 rounded-lg p-2.5 text-[11px] font-mono text-muted-foreground break-all leading-relaxed">
             {getEmbedCode()}
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 
   // Render mobile bottom sheet
@@ -432,8 +457,8 @@ export default function ShareMenu({
   // Render desktop dialog
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
           <DialogTitle>
             {showActions && view === 'actions' ? 'Actions' : 'Share'}
           </DialogTitle>
@@ -442,7 +467,9 @@ export default function ShareMenu({
           </DialogDescription>
         </DialogHeader>
         
-        {showActions && view === 'actions' ? <ActionsContent /> : <ShareContent />}
+        <div className="max-h-[70vh] overflow-y-auto">
+          {showActions && view === 'actions' ? <ActionsContent /> : <ShareContent />}
+        </div>
       </DialogContent>
     </Dialog>
   );

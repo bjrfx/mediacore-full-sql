@@ -68,6 +68,7 @@ export default function BottomNav() {
     <>
       {/* Bottom Navigation - Only visible on mobile (< md) */}
       <nav
+        data-component="bottom-navbar"
         className={cn(
           'fixed bottom-0 left-0 right-0 z-40',
           'md:hidden', // Hide on tablet/desktop

@@ -1063,6 +1063,7 @@ function MiniPlayer() {
   // Mini player bar
   return (
     <motion.div
+      data-component="mini-player"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       className="mini-player flex items-center px-4 gap-4"
