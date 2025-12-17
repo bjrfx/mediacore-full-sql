@@ -476,6 +476,13 @@ function MiniPlayer() {
 
   const VolumeIcon = isMuted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
+  console.log('[MiniPlayer] Render check', {
+    isMiniPlayerVisible,
+    hasCurrentTrack: !!currentTrack,
+    currentTrack: currentTrack?.title,
+    isPlaying,
+  });
+
   if (!isMiniPlayerVisible || !currentTrack) return null;
 
   // Expanded full-screen player (Video or Audio)

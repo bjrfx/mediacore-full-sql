@@ -117,11 +117,27 @@ const usePlayerStore = create(
         });
       },
 
-      playTrack: async (track, queue = null, resumeFromSaved = true) => {
-        // Check subscription before playing
-        const canPlay = await checkSubscription();
-        if (!canPlay) {
-          return; // Subscription modal will be shown
+      playTrack: async (track, queue = null, resumeFromSaved = true, options = {}) => {
+        const { skipSubscriptionCheck = false } = options;
+
+        console.log('[playerStore] playTrack called', {
+          track,
+          queue,
+          resumeFromSaved,
+          skipSubscriptionCheck,
+          hasFileUrl: !!track?.fileUrl,
+          hasFilePath: !!track?.filePath,
+        });
+
+        // Check subscription before playing (can be skipped for public share pages)
+        if (!skipSubscriptionCheck) {
+          const canPlay = await checkSubscription();
+          if (!canPlay) {
+            console.log('[playerStore] Subscription check failed, blocking playback');
+            return; // Subscription modal will be shown
+          }
+        } else {
+          console.log('[playerStore] Skipping subscription check for public access');
         }
         
         // Save progress of current track before switching
@@ -169,6 +185,12 @@ const usePlayerStore = create(
         if (queue) {
           const normalizedQueue = queue.map(normalizeTrack);
           const index = normalizedQueue.findIndex((t) => t.id === normalizedTrack.id);
+          console.log('[playerStore] Setting state with queue', {
+            queueLength: normalizedQueue.length,
+            index,
+            trackToPlay,
+            isMiniPlayerVisible: true,
+          });
           set({
             queue: normalizedQueue,
             queueIndex: index >= 0 ? index : 0,
@@ -179,6 +201,10 @@ const usePlayerStore = create(
             seekToTime: resumeTime > 0 ? resumeTime : null, // Signal player to seek
           });
         } else {
+          console.log('[playerStore] Setting state without queue', {
+            trackToPlay,
+            isMiniPlayerVisible: true,
+          });
           set({
             currentTrack: trackToPlay,
             isPlaying: true,
@@ -251,10 +277,11 @@ const usePlayerStore = create(
       // Clear all progress
       clearAllProgress: () => set({ playbackProgress: {} }),
 
-      togglePlay: async () => {
+      togglePlay: async (options = {}) => {
+        const { skipSubscriptionCheck = false } = options;
         const { isPlaying } = get();
         // Only check subscription when trying to play (not pause)
-        if (!isPlaying) {
+        if (!isPlaying && !skipSubscriptionCheck) {
           const canPlay = await checkSubscription();
           if (!canPlay) return;
         }

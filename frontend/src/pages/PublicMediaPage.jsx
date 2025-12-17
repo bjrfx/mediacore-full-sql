@@ -21,6 +21,7 @@ import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import ThumbnailFallback from '../components/media/ThumbnailFallback';
 import MediaMeta from '../components/media/MediaMeta';
+import MiniPlayer from '../components/layout/MiniPlayer';
 import { ShareButton, MediaActionsButton } from '../components/media/ShareMenu';
 import { cn, formatDuration, getLanguageName } from '../lib/utils';
 
@@ -47,7 +48,7 @@ export default function PublicMediaPage() {
     currentTrack, 
     isPlaying, 
     playTrack, 
-    togglePlayPause 
+    togglePlay 
   } = usePlayerStore();
   const { isFavorite, toggleFavorite } = useLibraryStore();
 
@@ -80,14 +81,31 @@ export default function PublicMediaPage() {
     }
   }, [media, location.pathname, navigate, id]);
 
-  // Play handler
+  // Play handler - Public pages always use playTrack for consistent behavior
   const handlePlay = () => {
-    if (!media) return;
-    if (isCurrentTrack) {
-      togglePlayPause();
-    } else {
-      playTrack(media, [media]);
+    if (!media) {
+      console.error('[PublicMediaPage] No media data available');
+      return;
     }
+    
+    console.log('[PublicMediaPage] Play button clicked', {
+      media,
+      isCurrentTrack,
+      isPlaying,
+      hasFileUrl: !!media.fileUrl,
+      hasFilePath: !!media.filePath,
+    });
+    
+    // If already playing this track, pause it
+    if (isCurrentTrack && isPlaying) {
+      console.log('[PublicMediaPage] Pausing current track');
+      togglePlay({ skipSubscriptionCheck: true });
+      return;
+    }
+    
+    // Otherwise start playing (skip subscription check for public access)
+    console.log('[PublicMediaPage] Starting playback with skipSubscriptionCheck');
+    playTrack(media, [media], true, { skipSubscriptionCheck: true });
   };
 
   // Error state
@@ -374,6 +392,9 @@ export default function PublicMediaPage() {
           )}
         </main>
       </motion.div>
+
+      {/* Mini Player */}
+      <MiniPlayer />
     </>
   );
 }
