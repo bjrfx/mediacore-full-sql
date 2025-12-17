@@ -379,9 +379,29 @@
   .audio-bar:nth-child(3) { animation-delay: 0.2s; }
   .audio-bar:nth-child(4) { animation-delay: 0.3s; }
 
+  /* Mini audio bar for compact views */
+  .audio-bar-mini {
+    @apply w-0.5 bg-current rounded-full;
+    animation: audio-wave-mini 0.8s ease-in-out infinite;
+  }
+
+  .audio-bar-mini:nth-child(1) { animation-delay: 0s; }
+  .audio-bar-mini:nth-child(2) { animation-delay: 0.1s; }
+  .audio-bar-mini:nth-child(3) { animation-delay: 0.15s; }
+
   @keyframes audio-wave {
     0%, 100% { height: 8px; }
     50% { height: 24px; }
+  }
+
+  @keyframes audio-wave-mini {
+    0%, 100% { height: 6px; }
+    50% { height: 14px; }
+  }
+
+  /* Safe area padding for bottom sheets */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
   /* Skeleton loading */

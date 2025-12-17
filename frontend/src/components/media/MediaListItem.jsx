@@ -1,17 +1,11 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, MoreHorizontal, Heart, ListPlus, GripVertical } from 'lucide-react';
+import { Play, MoreHorizontal, Heart, ListPlus, GripVertical, Share2 } from 'lucide-react';
 import { cn, formatDuration, formatRelativeTime } from '../../lib/utils';
 import { usePlayerStore, useLibraryStore, useUIStore } from '../../store';
 import { Button } from '../ui/button';
 import ThumbnailFallback from './ThumbnailFallback';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+import { MediaActionsButton } from './ShareMenu';
 
 export default function MediaListItem({ media, queue = [], index = 0, showIndex = false, showDragHandle = false, showDate = false }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayerStore();
@@ -141,49 +135,14 @@ export default function MediaListItem({ media, queue = [], index = 0, showIndex 
         {media.duration ? formatDuration(media.duration) : '--:--'}
       </span>
 
-      {/* More actions */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="iconSm"
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFavorite(media);
-            }}
-          >
-            <Heart
-              className={cn(
-                'mr-2 h-4 w-4',
-                isLiked && 'fill-primary text-primary'
-              )}
-            />
-            {isLiked ? 'Remove from Favorites' : 'Add to Favorites'}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              openModal('addToPlaylist', media);
-            }}
-          >
-            <ListPlus className="mr-2 h-4 w-4" />
-            Add to Playlist
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handlePlay}>
-            <Play className="mr-2 h-4 w-4" />
-            Play Now
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* More actions - using new ShareMenu */}
+      <MediaActionsButton
+        media={media}
+        queue={queue}
+        className="opacity-0 group-hover:opacity-100 transition-opacity"
+        size="iconSm"
+        alwaysVisible={false}
+      />
     </motion.div>
   );
 }

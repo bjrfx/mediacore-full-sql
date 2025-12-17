@@ -34,6 +34,10 @@ const ArtistsPage = lazy(() => import('./pages/ArtistsPage'));
 const Downloads = lazy(() => import('./pages/Downloads'));
 const Profile = lazy(() => import('./pages/Profile'));
 
+// Public shareable pages
+const PublicMediaPage = lazy(() => import('./pages/PublicMediaPage'));
+const EmbedPlayer = lazy(() => import('./pages/EmbedPlayer'));
+
 
 // Admin pages
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
@@ -92,6 +96,11 @@ function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+          {/* Public shareable routes - no layout wrapper */}
+          <Route path="/watch/:id" element={<PublicMediaPage />} />
+          <Route path="/listen/:id" element={<PublicMediaPage />} />
+          <Route path="/embed/:id" element={<EmbedPlayer />} />
+
           {/* Main app routes */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<Home />} />

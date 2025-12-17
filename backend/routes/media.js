@@ -495,6 +495,197 @@ router.get('/api/media/:id', checkApiKeyPermissions(), async (req, res) => {
   }
 });
 
+// =============================================================================
+// PUBLIC SHARING ROUTES
+// =============================================================================
+
+/**
+ * GET /api/share/:id
+ * Get public share information for a media item
+ * Returns SEO-friendly data for social sharing
+ */
+router.get('/api/share/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appDomain = process.env.APP_DOMAIN || 'https://app.mediacore.in';
+    
+    // Get media with artist name
+    const query = `
+      SELECT 
+        m.*,
+        a.name as artist_name
+      FROM media m
+      LEFT JOIN artists a ON m.artist_id = a.id
+      WHERE m.id = ?
+    `;
+    const rows = await db.query(query, [id]);
+    const row = rows[0];
+    
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media content not found'
+      });
+    }
+
+    const isVideo = row.type === 'video';
+    const shareType = isVideo ? 'watch' : 'listen';
+    
+    // Generate share data
+    const shareData = {
+      id: row.id,
+      title: row.title,
+      description: row.description || `${isVideo ? 'Watch' : 'Listen to'} "${row.title}" on MediaCore`,
+      type: row.type,
+      thumbnail: row.thumbnail || row.thumbnail_path,
+      artistName: row.artist_name || row.subtitle || 'Unknown',
+      duration: row.duration,
+      language: row.language || 'en',
+      
+      // URLs
+      shareUrl: `${appDomain}/${shareType}/${row.id}`,
+      embedUrl: `${appDomain}/embed/${row.id}`,
+      
+      // Embed code
+      embedCode: `<iframe src="${appDomain}/embed/${row.id}" width="${isVideo ? '560' : '100%'}" height="${isVideo ? '315' : '152'}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`,
+      
+      // Open Graph data
+      og: {
+        title: `${row.title} - MediaCore`,
+        description: row.description || `${isVideo ? 'Watch' : 'Listen to'} "${row.title}" by ${row.artist_name || 'Unknown'} on MediaCore`,
+        image: row.thumbnail || row.thumbnail_path,
+        type: isVideo ? 'video.other' : 'music.song',
+        url: `${appDomain}/${shareType}/${row.id}`,
+      },
+      
+      // Twitter Card data
+      twitter: {
+        card: isVideo ? 'player' : 'summary_large_image',
+        title: `${row.title} - MediaCore`,
+        description: row.description || `${isVideo ? 'Watch' : 'Listen to'} "${row.title}" on MediaCore`,
+        image: row.thumbnail || row.thumbnail_path,
+        player: isVideo ? `${appDomain}/embed/${row.id}` : null,
+      }
+    };
+    
+    res.json({
+      success: true,
+      data: shareData
+    });
+  } catch (error) {
+    console.error('Error generating share data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to generate share data'
+    });
+  }
+});
+
+/**
+ * GET /api/oembed
+ * oEmbed endpoint for embed discovery
+ * Allows platforms to discover embed info automatically
+ * 
+ * Query params:
+ * - url: The URL of the media item
+ * - format: json (only json is supported)
+ * - maxwidth: Maximum width for embed
+ * - maxheight: Maximum height for embed
+ */
+router.get('/api/oembed', async (req, res) => {
+  try {
+    const { url, format = 'json', maxwidth = 560, maxheight = 315 } = req.query;
+    
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'URL parameter is required'
+      });
+    }
+    
+    if (format !== 'json') {
+      return res.status(501).json({
+        success: false,
+        error: 'Not Implemented',
+        message: 'Only JSON format is supported'
+      });
+    }
+    
+    const appDomain = process.env.APP_DOMAIN || 'https://app.mediacore.in';
+    
+    // Parse the URL to extract media ID
+    // Supports: /watch/:id, /listen/:id, /embed/:id, /play/:id
+    const urlPattern = /\/(watch|listen|embed|play)\/([a-zA-Z0-9-_]+)/;
+    const match = url.match(urlPattern);
+    
+    if (!match) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Invalid MediaCore URL'
+      });
+    }
+    
+    const mediaId = match[2];
+    
+    // Get media details
+    const query = `
+      SELECT 
+        m.*,
+        a.name as artist_name
+      FROM media m
+      LEFT JOIN artists a ON m.artist_id = a.id
+      WHERE m.id = ?
+    `;
+    const rows = await db.query(query, [mediaId]);
+    const media = rows[0];
+    
+    if (!media) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Media not found'
+      });
+    }
+    
+    const isVideo = media.type === 'video';
+    
+    // Calculate dimensions
+    const width = Math.min(parseInt(maxwidth), 1920);
+    const height = isVideo 
+      ? Math.min(parseInt(maxheight), Math.round(width * 9 / 16)) 
+      : 152;
+    
+    // oEmbed response
+    const oembedResponse = {
+      type: isVideo ? 'video' : 'rich',
+      version: '1.0',
+      title: media.title,
+      author_name: media.artist_name || media.subtitle || 'Unknown',
+      provider_name: 'MediaCore',
+      provider_url: appDomain,
+      thumbnail_url: media.thumbnail || media.thumbnail_path,
+      thumbnail_width: 480,
+      thumbnail_height: 360,
+      html: `<iframe width="${width}" height="${height}" src="${appDomain}/embed/${media.id}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`,
+      width: width,
+      height: height,
+    };
+    
+    res.json(oembedResponse);
+  } catch (error) {
+    console.error('Error generating oEmbed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to generate oEmbed data'
+    });
+  }
+});
+
 /**
  * GET /api/languages
  * Get list of available languages with content counts

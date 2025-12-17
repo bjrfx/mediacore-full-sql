@@ -7,3 +7,5 @@ export { default as History } from './History';
 export { default as Settings } from './Settings';
 export { default as MediaPlayer } from './MediaPlayer';
 export { default as Profile } from './Profile';
+export { default as PublicMediaPage } from './PublicMediaPage';
+export { default as EmbedPlayer } from './EmbedPlayer';

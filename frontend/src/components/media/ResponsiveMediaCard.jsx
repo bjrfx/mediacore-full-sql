@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, MoreHorizontal, Heart, ListPlus, Download, Trash2 } from 'lucide-react';
+import { Play, Pause, MoreHorizontal, Heart, ListPlus, Download, Trash2, Share2 } from 'lucide-react';
 import { cn, getLanguageName } from '../../lib/utils';
 import usePlayerStore from '../../store/playerStore';
 import useLibraryStore from '../../store/libraryStore';
@@ -10,13 +10,7 @@ import useAuthStore from '../../store/authStore';
 import { Button } from '../ui/button';
 import DownloadButton from '../ui/DownloadButton';
 import ThumbnailFallback from './ThumbnailFallback';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+import { MediaActionsButton, ShareButton } from './ShareMenu';
 
 /**
  * ResponsiveMediaCard - Mobile-first responsive card design
@@ -36,6 +30,11 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
   const { user } = useAuthStore();
   const { startDownload, removeDownload, isDownloaded } = useDownloadStore();
 
+  // Long press handling for mobile
+  const longPressRef = useRef(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+
   const isCurrentTrack = currentTrack?.id === media.id;
   const isLiked = isFavorite(media.id);
   const isVideo = media.type === 'video';
@@ -51,12 +50,44 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
   };
 
   const handleCardClick = () => {
+    // Don't trigger play if long press menu is active
+    if (showActionsMenu || isLongPressing) return;
+    
     if (isCurrentTrack) {
       togglePlay();
     } else {
       playTrack(media, queue.length > 0 ? queue : [media]);
     }
   };
+
+  // Long press handlers for mobile
+  const handleTouchStart = useCallback(() => {
+    longPressRef.current = setTimeout(() => {
+      setIsLongPressing(true);
+      setShowActionsMenu(true);
+      // Trigger haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 500); // 500ms for long press
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+    // Reset long pressing state after a brief delay
+    setTimeout(() => setIsLongPressing(false), 100);
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    // Cancel long press if user moves finger
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }, []);
 
   return (
     <motion.div
@@ -66,6 +97,9 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
       transition={{ duration: 0.2 }}
       whileHover={{ y: -4 }}
       onClick={handleCardClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
       className="w-full min-w-0 flex flex-col cursor-pointer group"
     >
       {/* Card Container - ensures no overflow */}
@@ -148,16 +182,26 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
               </span>
             </div>
 
-            {/* Download button - top right, appears on hover */}
+            {/* ALWAYS VISIBLE 3-dot action button - top right */}
+            <div className="absolute top-2 right-2 z-10">
+              <MediaActionsButton 
+                media={media} 
+                queue={queue}
+                className="bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white"
+                alwaysVisible={true}
+              />
+            </div>
+
+            {/* Download button - appears on hover only on desktop */}
             {user && (
-              <div className="absolute top-2 right-2 opacity-0 group-hover/image:opacity-100 transition-opacity">
+              <div className="absolute bottom-2 right-2 opacity-0 group-hover/image:opacity-100 transition-opacity hidden sm:block">
                 <DownloadButton media={media} size="sm" />
               </div>
             )}
 
             {/* Currently playing indicator - animated bars */}
             {isCurrentTrack && isPlaying && (
-              <div className="absolute bottom-2 right-2 flex items-end gap-0.5">
+              <div className="absolute bottom-2 left-2 flex items-end gap-0.5">
                 <div className="audio-bar" style={{ animationDelay: '0s' }} />
                 <div className="audio-bar" style={{ animationDelay: '0.1s' }} />
                 <div className="audio-bar" style={{ animationDelay: '0.2s' }} />
@@ -165,10 +209,10 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
               </div>
             )}
 
-            {/* Like button - bottom right corner alternative */}
-            {isLiked && (
+            {/* Like indicator - shown only if liked */}
+            {isLiked && !isCurrentTrack && (
               <div className="absolute bottom-2 left-2">
-                <Heart className="h-5 w-5 fill-red-500 text-red-500" />
+                <Heart className="h-5 w-5 fill-red-500 text-red-500 drop-shadow-lg" />
               </div>
             )}
           </div>
@@ -193,8 +237,8 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
             {media.artistName || media.subtitle || 'Unknown'}
           </p>
 
-          {/* Action buttons - mobile-friendly */}
-          <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Action buttons row - visible on hover for desktop */}
+          <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 sm:flex hidden">
             
             {/* Like button */}
             <Button
@@ -214,78 +258,26 @@ export default function ResponsiveMediaCard({ media, queue = [], index = 0 }) {
               />
             </Button>
 
-            {/* More options dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 px-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleFavorite(media);
-                  }}
-                >
-                  <Heart
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      isLiked && 'fill-red-500 text-red-500'
-                    )}
-                  />
-                  {isLiked ? 'Remove from Favorites' : 'Add to Favorites'}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openModal('addToPlaylist', media);
-                  }}
-                >
-                  <ListPlus className="mr-2 h-4 w-4" />
-                  Add to Playlist
-                </DropdownMenuItem>
-                {user && (
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (downloaded) {
-                        removeDownload(media.id);
-                      } else {
-                        startDownload(media);
-                      }
-                    }}
-                  >
-                    {downloaded ? (
-                      <>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Remove Download
-                      </>
-                    ) : (
-                      <>
-                        <Download className="mr-2 h-4 w-4" />
-                        Download
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlay(e);
-                  }}
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Play Now
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Share button */}
+            <ShareButton 
+              media={media} 
+              queue={queue}
+              className="h-8 px-2"
+              size="sm"
+            />
+
+            {/* Add to playlist */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                openModal('addToPlaylist', media);
+              }}
+            >
+              <ListPlus className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>

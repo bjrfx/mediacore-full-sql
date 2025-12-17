@@ -7,3 +7,5 @@ export { default as MediaList } from './MediaList';
 export { default as ThumbnailFallback } from './ThumbnailFallback';
 export { default as LanguageCard, LanguageCardGrid, CompactLanguageBadges } from './LanguageCard';
 export { default as SubtitleManager } from './SubtitleManager';
+export { default as ShareMenu, ShareButton, MediaActionsButton } from './ShareMenu';
+export { default as MediaMeta } from './MediaMeta';

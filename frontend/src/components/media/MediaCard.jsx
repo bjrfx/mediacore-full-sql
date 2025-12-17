@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, MoreHorizontal, Heart, ListPlus, Download, Trash2 } from 'lucide-react';
+import { Play, Pause, MoreHorizontal, Heart, ListPlus, Download, Trash2, Share2 } from 'lucide-react';
 import { cn, getLanguageName } from '../../lib/utils';
 import usePlayerStore from '../../store/playerStore';
 import useLibraryStore from '../../store/libraryStore';
@@ -10,13 +10,7 @@ import useAuthStore from '../../store/authStore';
 import { Button } from '../ui/button';
 import DownloadButton from '../ui/DownloadButton';
 import ThumbnailFallback from './ThumbnailFallback';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+import { MediaActionsButton } from './ShareMenu';
 
 export default function MediaCard({ media, queue = [], index = 0, size = 'medium' }) {
   const { currentTrack, isPlaying, playTrack, togglePlay } = usePlayerStore();
@@ -24,6 +18,10 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
   const { openModal } = useUIStore();
   const { user } = useAuthStore();
   const { startDownload, removeDownload, isDownloaded } = useDownloadStore();
+
+  // Long press handling for mobile
+  const longPressRef = useRef(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   const isCurrentTrack = currentTrack?.id === media.id;
   const isLiked = isFavorite(media.id);
@@ -40,12 +38,36 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
   };
 
   const handleCardClick = () => {
+    if (isLongPressing) return;
     if (isCurrentTrack) {
       togglePlay();
     } else {
       playTrack(media, queue.length > 0 ? queue : [media]);
     }
   };
+
+  // Long press handlers for mobile
+  const handleTouchStart = useCallback(() => {
+    longPressRef.current = setTimeout(() => {
+      setIsLongPressing(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+    }, 500);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+    setTimeout(() => setIsLongPressing(false), 100);
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }, []);
 
   const sizeClasses = {
     small: 'w-36',
@@ -58,6 +80,9 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={handleCardClick}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
       className={cn(
         'media-card group cursor-pointer',
         sizeClasses[size]
@@ -108,6 +133,17 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
           </motion.div>
         </div>
 
+        {/* ALWAYS VISIBLE 3-dot action button - top right */}
+        <div className="absolute top-2 right-2 z-10">
+          <MediaActionsButton 
+            media={media} 
+            queue={queue}
+            className="bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white h-8 w-8"
+            alwaysVisible={true}
+            size="iconSm"
+          />
+        </div>
+
         {/* Type badge */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
           <span
@@ -134,20 +170,27 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
           </span>
         </div>
 
-        {/* Download button */}
+        {/* Download button - appears on hover on desktop */}
         {user && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
             <DownloadButton media={media} size="sm" />
           </div>
         )}
 
         {/* Currently playing indicator */}
         {isCurrentTrack && isPlaying && (
-          <div className="absolute bottom-2 right-2 flex items-end gap-0.5">
+          <div className="absolute bottom-2 left-2 flex items-end gap-0.5">
             <div className="audio-bar" style={{ animationDelay: '0s' }} />
             <div className="audio-bar" style={{ animationDelay: '0.1s' }} />
             <div className="audio-bar" style={{ animationDelay: '0.2s' }} />
             <div className="audio-bar" style={{ animationDelay: '0.3s' }} />
+          </div>
+        )}
+
+        {/* Like indicator */}
+        {isLiked && !isCurrentTrack && (
+          <div className="absolute bottom-2 left-2">
+            <Heart className="h-4 w-4 fill-red-500 text-red-500 drop-shadow-lg" />
           </div>
         )}
       </div>
@@ -167,79 +210,6 @@ export default function MediaCard({ media, queue = [], index = 0, size = 'medium
             {media.artistName || media.subtitle || 'Unknown artist'}
           </p>
         </div>
-
-        {/* Actions */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="iconSm"
-              className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(media);
-              }}
-            >
-              <Heart
-                className={cn(
-                  'mr-2 h-4 w-4',
-                  isLiked && 'fill-primary text-primary'
-                )}
-              />
-              {isLiked ? 'Remove from Favorites' : 'Add to Favorites'}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                openModal('addToPlaylist', media);
-              }}
-            >
-              <ListPlus className="mr-2 h-4 w-4" />
-              Add to Playlist
-            </DropdownMenuItem>
-            {user && (
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (downloaded) {
-                    removeDownload(media.id);
-                  } else {
-                    startDownload(media);
-                  }
-                }}
-              >
-                {downloaded ? (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove Download
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download
-                  </>
-                )}
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePlay(e);
-              }}
-            >
-              <Play className="mr-2 h-4 w-4" />
-              Play Now
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </motion.div>
   );
