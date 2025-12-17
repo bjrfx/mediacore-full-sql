@@ -10,6 +10,7 @@ import {
   Disc,
   Music,
   Film,
+  Video,
   Play,
   User,
   GripVertical,
@@ -513,16 +514,27 @@ export default function AdminArtistDetail() {
       return;
     }
 
+    // Check if any selected files are HLS and don't have a mediaType specified
+    const hlsFilesNeedingType = selectedFiles.filter(file => 
+      file.type === 'hls' && !fileManagerSelections[file.id]?.mediaType
+    );
+    
+    if (hlsFilesNeedingType.length > 0) {
+      addToast({ message: 'Please select Video or Audio type for HLS content', type: 'error' });
+      return;
+    }
+
     setIsCreatingMedia(true);
 
     try {
-      // Prepare files data with subtitles and thumbnails
+      // Prepare files data with subtitles, thumbnails, and media type
       const filesData = selectedFiles.map(file => {
         const selections = fileManagerSelections[file.id] || {};
         return {
           path: file.path,
           name: file.name,
           type: file.type,
+          mediaType: selections.mediaType || null, // For HLS: 'video' or 'audio'
           subtitlePath: selections.subtitle?.path || null,
           thumbnailPath: selections.thumbnail?.path || null,
         };
@@ -1127,6 +1139,8 @@ export default function AdminArtistDetail() {
                                 <div className="flex items-center gap-2 mb-2">
                                   {file.type === 'video' ? (
                                     <Film className="h-4 w-4 text-blue-500" />
+                                  ) : file.type === 'hls' ? (
+                                    <Video className="h-4 w-4 text-cyan-500" />
                                   ) : (
                                     <Music className="h-4 w-4 text-purple-500" />
                                   )}
@@ -1135,6 +1149,45 @@ export default function AdminArtistDetail() {
                                     {file.type}
                                   </Badge>
                                 </div>
+                                
+                                {/* Media Type Selection for HLS */}
+                                {file.type === 'hls' && (
+                                  <div className="mb-3 p-2 border rounded-lg bg-muted/50">
+                                    <Label className="text-xs font-medium mb-2 block">
+                                      Media Type *
+                                    </Label>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant={selections.mediaType === 'video' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="flex-1 h-8"
+                                        onClick={() => {
+                                          setFileManagerSelections(prev => ({
+                                            ...prev,
+                                            [file.id]: { ...prev[file.id], mediaType: 'video' }
+                                          }));
+                                        }}
+                                      >
+                                        <Film className="h-3 w-3 mr-1" />
+                                        Video
+                                      </Button>
+                                      <Button
+                                        variant={selections.mediaType === 'audio' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className="flex-1 h-8"
+                                        onClick={() => {
+                                          setFileManagerSelections(prev => ({
+                                            ...prev,
+                                            [file.id]: { ...prev[file.id], mediaType: 'audio' }
+                                          }));
+                                        }}
+                                      >
+                                        <Music className="h-3 w-3 mr-1" />
+                                        Audio
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
                                 
                                 <div className="grid grid-cols-2 gap-3">
                                   {/* Subtitle Selection */}

@@ -619,9 +619,9 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
     
     for (const file of files) {
       try {
-        const { path: filePath, name, type, subtitlePath, thumbnailPath } = file;
+        const { path: filePath, name, type, mediaType, subtitlePath, thumbnailPath } = file;
         
-        console.log('[CREATE MEDIA] Processing file:', { filePath, name, type });
+        console.log('[CREATE MEDIA] Processing file:', { filePath, name, type, mediaType });
         
         // Validate file type is audio or video
         if (!['audio', 'video', 'hls'].includes(type)) {
@@ -643,7 +643,7 @@ router.post('/api/files/create-media', checkAdminAuth, async (req, res) => {
         const mediaData = {
           id: mediaId,
           title: name.replace(/\.[^/.]+$/, ''), // Remove extension
-          type: isHLS ? 'video' : type,
+          type: isHLS ? (mediaType || 'video') : type, // Use mediaType for HLS, default to video
           url: mediaUrl,
           thumbnail_url: thumbnailPath || null,
           artist_id: artistId || null,

@@ -322,7 +322,7 @@ class FileStorageService {
         extension: path.extname(filePath),
       };
       
-      // For HLS directories, find the .m3u8 playlist file
+      // For HLS directories, find the .m3u8 playlist file and calculate total size
       if (stats.isDirectory()) {
         const files = await fs.readdir(fullPath);
         const m3u8File = files.find(f => f.endsWith('.m3u8'));
@@ -331,6 +331,17 @@ class FileStorageService {
           metadata.type = 'hls';
           metadata.hlsPlaylistUrl = `/uploads/${filePath.replace(/\\/g, '/')}/${m3u8File}`;
           metadata.hlsPlaylistPath = path.join(filePath, m3u8File);
+          
+          // Calculate total size of all files in HLS directory
+          let totalSize = 0;
+          for (const file of files) {
+            const fileFullPath = path.join(fullPath, file);
+            const fileStat = await fs.stat(fileFullPath);
+            if (fileStat.isFile()) {
+              totalSize += fileStat.size;
+            }
+          }
+          metadata.size = totalSize;
         }
       }
       
