@@ -13,6 +13,104 @@ const { createStreamingRoutes } = require('./middleware/mediaStreamer');
 const app = express();
 
 // Ensure required upload directories exist
+const ensureDirectories = () => {
+  const dirs = [
+    path.join(__dirname, 'public/uploads'),
+    path.join(__dirname, 'public/uploads/video'),
+    path.join(__dirname, 'public/uploads/audio'),
+    path.join(__dirname, 'public/uploads/subtitles'),
+    path.join(__dirname, 'public/uploads/hls'),
+    path.join(__dirname, 'public/uploads/temp'),
+  ];
+  
+  dirs.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`📁 Created directory: ${dir}`);
+    }
+  });
+};
+
+ensureDirectories();
+
+// Middleware
+app.use(cors({ 
+  origin: '*',
+  exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length']
+}));
+
+// Compression for API responses (skip media files - they're already compressed)
+app.use(compression({
+  filter: (req, res) => {
+    // Don't compress media streams
+    if (req.path.startsWith('/uploads/audio') || 
+        req.path.startsWith('/uploads/video') ||
+        req.path.startsWith('/stream/')) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Balanced compression level
+}));
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Static files with caching headers
+app.use('/public', express.static(path.join(__dirname, 'public'), {
+  maxAge: '1d',
+  etag: true
+}));
+
+// Media streaming with Range request support (must be before static)
+const uploadsDir = path.join(__dirname, 'public', 'uploads');
+createStreamingRoutes(app, uploadsDir);
+
+// HLS streaming support - serve .m3u8 and .ts files with proper headers
+app.use('/uploads/hls', express.static(path.join(__dirname, 'public/uploads/hls'), {
+  maxAge: '1h', // Shorter cache for HLS to allow updates
+  etag: true,
+  setHeaders: (res, filePath) => {
+    // Set proper MIME types for HLS files
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.m3u8') {
+      res.set('Content-Type', 'application/vnd.apple.mpegurl');
+    } else if (ext === '.ts') {
+      res.set('Content-Type', 'video/MP2T');
+    }
+    // Enable CORS for HLS streaming
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Range, Accept, Content-Type');
+    res.set('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
+    res.set('Accept-Ranges', 'bytes');
+  }
+}));
+
+// Static uploads fallback (for thumbnails and other files)
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads'), {
+  maxAge: '1d',
+  etag: true,
+  setHeaders: (res, filePath) => {
+    // Add Accept-Ranges for all files
+    res.set('Accept-Ranges', 'bytes');
+  }
+}));
+
+// Request logger - logs to MySQL for analytics
+const requestLogger = require('./middleware/requestLogger');
+app.use(requestLogger);
+
+// Console logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
+// Health
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'MediaCore API - MySQL Edition', version: '2.0.0', timestamp: new Date().toISOString() });
+});
 
 app.get('/health', (req, res) => {
   res.json({ success: true, status: 'healthy', timestamp: new Date().toISOString() });
@@ -56,8 +154,204 @@ app.get('/api/albums/:id', async (req, res) => {
 app.get('/api/settings', async (req, res) => {
   try {
     const settings = await db.query('SELECT setting_key, setting_value FROM app_settings WHERE is_public = TRUE');
+    const settingsObj = {};
+    settings.forEach(s => { settingsObj[s.setting_key] = s.setting_value; });
+    res.json({ success: true, data: settingsObj });
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    res.status(500).json({ success: false, message: 'Error fetching settings' });
+  }
+});
+
+app.get('/api/user/subscription', checkAuth, async (req, res) => {
+  try {
+    const subscriptions = await db.query('SELECT * FROM user_subscriptions WHERE uid = ?', [req.user.uid]);
+    if (subscriptions.length === 0) {
+      return res.json({ 
+        success: true, 
+        data: { 
+          subscriptionTier: 'free', 
+          status: 'active' 
+        } 
+      });
+    }
+    
+    // Transform snake_case to camelCase for frontend
+    const subscription = subscriptions[0];
+    res.json({ 
+      success: true, 
+      data: {
+        uid: subscription.uid,
+        subscriptionTier: subscription.subscription_tier,
+        status: subscription.status || 'active',
+        updatedAt: subscription.updated_at,
+        expiresAt: subscription.expires_at
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching subscription:', error);
+    res.status(500).json({ success: false, message: 'Error fetching subscription' });
+  }
+});
+
+app.get('/api/user/stats', checkAuth, async (req, res) => {
+  try {
+    const stats = await db.query('SELECT * FROM user_stats WHERE uid = ?', [req.user.uid]);
+    res.json({ success: true, data: stats[0] || { uid: req.user.uid, totalPlays: 0 } });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ success: false, message: 'Error fetching stats' });
+  }
+});
+
+app.post('/api/user/heartbeat', checkAuth, async (req, res) => {
+  try {
+    const deviceType = req.headers['x-device-type'] || null;
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const userAgent = req.headers['user-agent'] || null;
+
+    await db.query(
+      `INSERT INTO user_presence (uid, is_online, last_active, device_type, ip_address, user_agent) 
+       VALUES (?, TRUE, NOW(), ?, ?, ?) 
+       ON DUPLICATE KEY UPDATE 
+         is_online = TRUE, 
+         last_active = NOW(), 
+         device_type = VALUES(device_type),
+         ip_address = VALUES(ip_address),
+         user_agent = VALUES(user_agent)`,
+      [req.user.uid, deviceType, ipAddress, userAgent]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating heartbeat:', error);
+    res.status(500).json({ success: false });
+  }
+});
+
+app.get('/admin/users', checkAdminAuth, async (req, res) => {
+  try {
+    const users = await db.query(`
+      SELECT 
+        u.uid, 
+        u.email, 
+        u.display_name, 
+        u.email_verified, 
+        u.created_at,
+        ur.role,
+        us.subscription_tier
+      FROM users u
+      LEFT JOIN user_roles ur ON u.uid = ur.uid
+      LEFT JOIN user_subscriptions us ON u.uid = us.uid
+      LIMIT 100
+    `);
+    // Transform snake_case to camelCase for frontend
+    const transformedUsers = users.map(user => ({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.display_name,
+      emailVerified: user.email_verified === 1 || user.email_verified === true,
+      createdAt: user.created_at,
+      role: user.role || 'user',
       subscriptionTier: user.subscription_tier || 'free',
       disabled: false, // Add a disabled column to users table if needed
+      metadata: {
+        creationTime: user.created_at,
+        lastSignInTime: user.created_at // You can add a last_login column if needed
+      }
+    }));
+    res.json({ success: true, count: transformedUsers.length, data: { count: transformedUsers.length, users: transformedUsers } });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, message: 'Error fetching users' });
+  }
+});
+
+app.get('/admin/users/online', checkAdminAuth, async (req, res) => {
+  try {
+    const users = await db.query(
+      'SELECT u.uid, u.email, u.display_name, up.last_active, up.device_type, up.ip_address, up.user_agent FROM users u JOIN user_presence up ON u.uid = up.uid WHERE up.is_online = TRUE AND up.last_active >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)'
+    );
+    // Transform snake_case to camelCase for frontend
+    const transformedUsers = users.map(user => ({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.display_name,
+      lastActive: user.last_active,
+      deviceType: user.device_type,
+      ipAddress: user.ip_address,
+      userAgent: user.user_agent
+    }));
+    res.json({ success: true, count: transformedUsers.length, data: { count: transformedUsers.length, users: transformedUsers } });
+  } catch (error) {
+    console.error('Error fetching online users:', error);
+    res.status(500).json({ success: false, message: 'Error fetching users' });
+  }
+});
+
+app.get('/admin/api-keys', checkAdminAuth, async (req, res) => {
+  try {
+    const keys = await db.query('SELECT * FROM api_keys WHERE is_active = 1');
+    // Transform to camelCase and parse JSON fields
+    const transformedKeys = keys.map(key => ({
+      id: key.id,
+      name: key.name,
+      apiKey: key.api_key,
+      keyPreview: key.api_key ? `${key.api_key.substring(0, 10)}...${key.api_key.slice(-4)}` : '',
+      accessType: key.access_type,
+      permissions: key.permissions ? (typeof key.permissions === 'string' ? JSON.parse(key.permissions) : key.permissions) : [],
+      isActive: key.is_active === 1,
+      createdAt: key.created_at,
+      createdBy: key.created_by,
+      createdByEmail: key.created_by_email,
+      lastUsedAt: key.last_used_at,
+      usageCount: key.usage_count || 0,
+      expiresAt: key.expires_at,
+    }));
+    res.json({ success: true, count: transformedKeys.length, data: transformedKeys });
+  } catch (error) {
+    console.error('Error fetching API keys:', error);
+    res.status(500).json({ success: false, message: 'Error fetching API keys' });
+  }
+});
+
+app.post('/admin/generate-key', checkAdminAuth, async (req, res) => {
+  try {
+    const crypto = require('crypto');
+    const { v4: uuidv4 } = require('uuid');
+    const id = uuidv4();
+    const apiKey = 'mc_' + crypto.randomBytes(32).toString('hex');
+    const { name, accessType = 'read_only', expiresInDays } = req.body;
+    
+    // Calculate expiry date if provided
+    let expiresAt = null;
+    if (expiresInDays && expiresInDays > 0) {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + parseInt(expiresInDays));
+      expiresAt = expiry.toISOString().slice(0, 19).replace('T', ' ');
+    }
+    
+    // Set permissions based on access type
+    const permissions = accessType === 'full_access' 
+      ? JSON.stringify(['read:media', 'write:media', 'read:artists', 'write:artists', 'read:albums', 'write:albums', 'admin'])
+      : JSON.stringify(['read:media', 'read:artists', 'read:albums']);
+    
+    await db.query(
+      'INSERT INTO api_keys (id, api_key, name, access_type, permissions, created_by, created_by_email, created_at, expires_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), ?, 1)',
+      [id, apiKey, name || 'New Key', accessType, permissions, req.user.uid, req.user.email, expiresAt]
+    );
+    
+    res.status(201).json({ 
+      success: true, 
+      data: { 
+        id,
+        apiKey, 
+        name,
+        accessType,
+        permissions: JSON.parse(permissions),
+        expiresAt
+      } 
+    });
+  } catch (error) {
     console.error('Error generating API key:', error);
     res.status(500).json({ success: false, message: 'Error generating key' });
   }
@@ -78,6 +372,104 @@ app.get('/admin/analytics/dashboard', checkAdminAuth, async (req, res) => {
     
     // Get request logs for charts (last 7 days)
     const dailyRequests = await db.query(`
+      SELECT 
+        DATE(timestamp) as date,
+        COUNT(*) as requests,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY DATE(timestamp)
+      ORDER BY date ASC
+    `);
+    
+    // Get top endpoints
+    const topEndpoints = await db.query(`
+      SELECT 
+        endpoint,
+        COUNT(*) as requests
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      GROUP BY endpoint
+      ORDER BY requests DESC
+      LIMIT 10
+    `);
+    
+    // Get recent activity
+    const recentActivity = await db.query(`
+      SELECT 
+        rl.id,
+        rl.timestamp,
+        rl.endpoint,
+        rl.method,
+        rl.status_code as statusCode,
+        ak.name as apiKeyName
+      FROM request_logs rl
+      LEFT JOIN api_keys ak ON rl.api_key_id = ak.id
+      ORDER BY rl.timestamp DESC
+      LIMIT 10
+    `);
+    
+    // Calculate success rate
+    const successRateResult = await db.queryOne(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful
+      FROM request_logs
+      WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    `);
+    const successRate = successRateResult?.total > 0 
+      ? ((successRateResult.successful / successRateResult.total) * 100).toFixed(1)
+      : 100;
+    
+    res.json({ 
+      success: true, 
+      data: { 
+        totalUsers: totalUsers?.count || 0, 
+        totalMedia: totalMedia?.count || 0,
+        overview: {
+          totalUsers: totalUsers?.count || 0,
+          totalMedia: totalMedia?.count || 0,
+          totalVideos: totalVideos?.count || 0,
+          totalAudio: totalAudio?.count || 0,
+          activeApiKeys: activeApiKeys?.count || 0,
+          totalRequests,
+          successRate: parseFloat(successRate)
+        },
+        charts: {
+          dailyRequests: dailyRequests.map(row => ({
+            date: row.date,
+            requests: row.requests,
+            successful: row.successful
+          })),
+          topEndpoints: topEndpoints.map(row => ({
+            endpoint: row.endpoint,
+            requests: row.requests
+          }))
+        },
+        recentActivity: recentActivity.map(row => ({
+          id: row.id,
+          timestamp: row.timestamp,
+          endpoint: row.endpoint,
+          method: row.method,
+          statusCode: row.statusCode,
+          apiKeyName: row.apiKeyName
+        }))
+      } 
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard:', error);
+    res.status(500).json({ success: false, message: 'Error fetching dashboard' });
+  }
+});
+
+app.get('/admin/analytics/summary', checkAdminAuth, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    
+    // Get request stats for the period
+    const stats = await db.queryOne(`
+      SELECT 
+        COUNT(*) as totalRequests,
         SUM(CASE WHEN status_code >= 200 AND status_code < 400 THEN 1 ELSE 0 END) as successful,
         AVG(response_time) as avgResponseTime
       FROM request_logs
