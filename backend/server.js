@@ -923,25 +923,24 @@ app.post('/admin/system/settings', checkAdminAuth, (req, res) => {
 app.get('/api/og/:mediaId', async (req, res) => {
   try {
     const { mediaId } = req.params;
-    const API_KEY = req.headers['x-api-key'];
+    console.log(`🔍 OG Request for media ID: ${mediaId}`);
 
-    // Check API key for security
-    if (!API_KEY) {
-      return res.status(401).json({ error: 'Missing x-api-key header' });
-    }
-
-    // Fetch media from database
+    // Fetch media from database (public endpoint - no API key required for social crawlers)
     const [media] = await db.query(
-      'SELECT id, title, description, type, file_path, thumbnail, artist_name, duration FROM media WHERE id = ?',
+      'SELECT id, title, description, type, file_path, thumbnail_path, artist, duration FROM media WHERE id = ?',
       [mediaId]
     );
 
-    if (!media || media.length === 0) {
+    console.log(`📊 Query result:`, media);
+
+    // media is the rows object from db.query, check if it's empty
+    if (!media || (typeof media === 'object' && Object.keys(media).length === 0)) {
       // Return generic OG tags if media not found
+      console.log(`❌ Media not found, returning generic OG tags`);
       return res.send(generateGenericOGHTML());
     }
 
-    const mediaData = media[0];
+    const mediaData = media;  // media is already the first row
     const isVideo = mediaData.type === 'video';
     const shareType = isVideo ? 'watch' : 'listen';
     const appDomain = process.env.REACT_APP_DOMAIN || 'https://app.mediacore.in';
@@ -949,8 +948,8 @@ app.get('/api/og/:mediaId', async (req, res) => {
     const pageUrl = `${appDomain}/${shareType}/${mediaData.id}`;
     const title = `${mediaData.title} - MediaCore`;
     const description = mediaData.description || 
-      `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}" by ${mediaData.artist_name || 'Unknown'} on MediaCore`;
-    const image = mediaData.thumbnail || `${appDomain}/logo512.png`;
+      `${isVideo ? 'Watch' : 'Listen to'} "${mediaData.title}" by ${mediaData.artist || 'Unknown'} on MediaCore`;
+    const image = mediaData.thumbnail_path || `${appDomain}/logo512.png`;
 
     // Generate HTML with meta tags
     const html = `<!DOCTYPE html>
