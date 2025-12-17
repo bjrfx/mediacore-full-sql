@@ -17,6 +17,9 @@ import {
   Check,
   ExternalLink,
   Loader2,
+  FolderOpen,
+  FileText,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { publicApi, adminApi } from '../../services/api';
@@ -52,7 +55,11 @@ import {
 } from '../../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Checkbox } from '../../components/ui/checkbox';
+import { FilePickerModal } from '../../components/admin/FilePickerModal';
 import { cn, generateGradient } from '../../lib/utils';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001';
 
 const ALBUM_TYPES = [
   { value: 'album', label: 'Album' },
@@ -76,10 +83,15 @@ export default function AdminArtistDetail() {
   const [showEditAlbumDialog, setShowEditAlbumDialog] = useState(false);
   const [showDeleteAlbumDialog, setShowDeleteAlbumDialog] = useState(false);
   const [showAssignMediaDialog, setShowAssignMediaDialog] = useState(false);
+  const [showFileManagerDialog, setShowFileManagerDialog] = useState(false);
   const [showEditArtistDialog, setShowEditArtistDialog] = useState(false);
   const [showDeleteArtistDialog, setShowDeleteArtistDialog] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [selectedMediaIds, setSelectedMediaIds] = useState([]);
+  const [assignMediaTab, setAssignMediaTab] = useState('existing'); // 'existing' or 'file-manager'
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [fileManagerSelections, setFileManagerSelections] = useState({});
+  const [isCreatingMedia, setIsCreatingMedia] = useState(false);
 
   const [albumForm, setAlbumForm] = useState({
     title: '',
@@ -462,6 +474,120 @@ export default function AdminArtistDetail() {
 
   const confirmDeleteArtist = () => {
     deleteArtistMutation.mutate();
+  };
+
+  // File Manager handlers
+  const handleFileManagerSelect = (files) => {
+    // Check if we're selecting subtitle/thumbnail for a specific file
+    const selectingFor = Object.entries(fileManagerSelections).find(
+      ([_, value]) => value?.selectingType
+    );
+    
+    if (selectingFor) {
+      const [fileId, selectionData] = selectingFor;
+      const type = selectionData.selectingType;
+      
+      if (files.length > 0) {
+        setFileManagerSelections(prev => ({
+          ...prev,
+          [fileId]: {
+            ...prev[fileId],
+            [type]: files[0],
+            selectingType: null
+          }
+        }));
+      }
+    } else {
+      // Selecting main media files
+      setSelectedFiles(files);
+    }
+    
+    setShowFileManagerDialog(false);
+  };
+
+  const handleCreateMediaFromFiles = async () => {
+    if (selectedFiles.length === 0) {
+      addToast({ message: 'No files selected', type: 'error' });
+      return;
+    }
+
+    setIsCreatingMedia(true);
+
+    try {
+      // Prepare files data with subtitles and thumbnails
+      const filesData = selectedFiles.map(file => {
+        const selections = fileManagerSelections[file.id] || {};
+        return {
+          path: file.path,
+          name: file.name,
+          type: file.type,
+          subtitlePath: selections.subtitle?.path || null,
+          thumbnailPath: selections.thumbnail?.path || null,
+        };
+      });
+
+      // Create media entries from files
+      const token = localStorage.getItem('accessToken');
+      const response = await axios.post(
+        `${API_BASE_URL}/api/files/create-media`,
+        {
+          files: filesData,
+          artistId: artistId,
+          albumId: null, // We'll add to album separately
+          language: 'en',
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success && response.data.data.created.length > 0) {
+        // Get current track count
+        const currentTracks = albumTracksCache[selectedAlbum.id] || [];
+        let nextTrackNumber = currentTracks.length + 1;
+
+        // Add each created media to the album
+        for (const media of response.data.data.created) {
+          await addMediaToAlbumMutation.mutateAsync({
+            albumId: selectedAlbum.id,
+            mediaId: media.id,
+            trackNumber: nextTrackNumber++,
+          });
+        }
+
+        // Invalidate queries
+        queryClient.invalidateQueries(['album-media', selectedAlbum.id]);
+        queryClient.invalidateQueries(['artist-albums', artistId]);
+        queryClient.invalidateQueries(['artist-media', artistId]);
+        queryClient.invalidateQueries(['admin-media']);
+
+        // Clear cache
+        setAlbumTracksCache((prev) => {
+          const newCache = { ...prev };
+          delete newCache[selectedAlbum.id];
+          return newCache;
+        });
+
+        setShowAssignMediaDialog(false);
+        setAssignMediaTab('existing');
+        setSelectedFiles([]);
+        setFileManagerSelections({});
+        addToast({
+          message: `Created and added ${response.data.data.created.length} tracks`,
+          type: 'success'
+        });
+      } else {
+        throw new Error('Failed to create media entries');
+      }
+    } catch (error) {
+      console.error('Error creating media from files:', error);
+      addToast({
+        message: error.response?.data?.message || 'Failed to create media from files',
+        type: 'error'
+      });
+    } finally {
+      setIsCreatingMedia(false);
+    }
   };
 
   // Play handlers
@@ -884,79 +1010,262 @@ export default function AdminArtistDetail() {
 
       {/* Assign Media Dialog */}
       <Dialog open={showAssignMediaDialog} onOpenChange={setShowAssignMediaDialog}>
-        <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add Tracks to {selectedAlbum?.title}</DialogTitle>
             <DialogDescription>
-              Select tracks to add to this album
+              Select tracks from existing media or file manager
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto py-4">
-            {unassignedMedia.length === 0 ? (
-              <div className="text-center py-8">
-                <Music className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">No unassigned media available</p>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {unassignedMedia.map((media) => (
-                  <div
-                    key={media.id}
-                    onClick={() => toggleMediaSelection(media.id)}
-                    className={cn(
-                      'flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors',
-                      selectedMediaIds.includes(media.id)
-                        ? 'bg-primary/20 border border-primary'
-                        : 'hover:bg-muted/50'
-                    )}
-                  >
-                    <Checkbox
-                      checked={selectedMediaIds.includes(media.id)}
-                      onCheckedChange={() => toggleMediaSelection(media.id)}
-                    />
+          
+          <Tabs value={assignMediaTab} onValueChange={setAssignMediaTab} className="flex-1 flex flex-col">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="existing">Existing Media</TabsTrigger>
+              <TabsTrigger value="file-manager">
+                <FolderOpen className="mr-2 h-4 w-4" />
+                From File Manager
+              </TabsTrigger>
+            </TabsList>
+            
+            {/* Existing Media Tab */}
+            <TabsContent value="existing" className="flex-1 overflow-y-auto py-4">
+              {unassignedMedia.length === 0 ? (
+                <div className="text-center py-8">
+                  <Music className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-muted-foreground">No unassigned media available</p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {unassignedMedia.map((media) => (
                     <div
+                      key={media.id}
+                      onClick={() => toggleMediaSelection(media.id)}
                       className={cn(
-                        'w-10 h-10 rounded shrink-0',
-                        `bg-gradient-to-br ${generateGradient(media.id)}`
+                        'flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors',
+                        selectedMediaIds.includes(media.id)
+                          ? 'bg-primary/20 border border-primary'
+                          : 'hover:bg-muted/50'
                       )}
                     >
-                      {media.thumbnail && (
-                        <img
-                          src={media.thumbnail}
-                          alt=""
-                          className="w-full h-full object-cover rounded"
-                        />
-                      )}
+                      <Checkbox
+                        checked={selectedMediaIds.includes(media.id)}
+                        onCheckedChange={() => toggleMediaSelection(media.id)}
+                      />
+                      <div
+                        className={cn(
+                          'w-10 h-10 rounded shrink-0',
+                          `bg-gradient-to-br ${generateGradient(media.id)}`
+                        )}
+                      >
+                        {media.thumbnail && (
+                          <img
+                            src={media.thumbnail}
+                            alt=""
+                            className="w-full h-full object-cover rounded"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{media.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {media.subtitle || 'No description'}
+                        </p>
+                      </div>
+                      <Badge variant={media.type === 'video' ? 'default' : 'secondary'}>
+                        {media.type}
+                      </Badge>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{media.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {media.subtitle || 'No description'}
-                      </p>
-                    </div>
-                    <Badge variant={media.type === 'video' ? 'default' : 'secondary'}>
-                      {media.type}
-                    </Badge>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+            
+            {/* File Manager Tab */}
+            <TabsContent value="file-manager" className="flex-1 py-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Select audio/video files from your file manager
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowFileManagerDialog(true)}
+                  >
+                    <FolderOpen className="mr-2 h-4 w-4" />
+                    Browse Files
+                  </Button>
+                </div>
+                
+                {selectedFiles.length === 0 ? (
+                  <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                    <FolderOpen className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      No files selected
+                    </p>
+                    <Button onClick={() => setShowFileManagerDialog(true)}>
+                      Select Files
+                    </Button>
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {selectedFiles.map((file, index) => {
+                      const selections = fileManagerSelections[file.id] || {};
+                      
+                      return (
+                        <Card key={file.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                  {file.type === 'video' ? (
+                                    <Film className="h-4 w-4 text-blue-500" />
+                                  ) : (
+                                    <Music className="h-4 w-4 text-purple-500" />
+                                  )}
+                                  <p className="font-medium truncate">{file.name}</p>
+                                  <Badge variant="outline" className="text-xs">
+                                    {file.type}
+                                  </Badge>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                  {/* Subtitle Selection */}
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <FileText className="h-3 w-3" />
+                                      Subtitle (optional)
+                                    </Label>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full justify-start text-xs h-8"
+                                      onClick={() => {
+                                        // Open file picker for subtitles
+                                        setFileManagerSelections(prev => ({
+                                          ...prev,
+                                          [file.id]: { ...prev[file.id], selectingType: 'subtitle' }
+                                        }));
+                                        setShowFileManagerDialog(true);
+                                      }}
+                                    >
+                                      {selections.subtitle ? (
+                                        <span className="truncate">{selections.subtitle.name}</span>
+                                      ) : (
+                                        'Select subtitle'
+                                      )}
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Thumbnail Selection */}
+                                  <div className="space-y-1">
+                                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <ImageIcon className="h-3 w-3" />
+                                      Thumbnail (optional)
+                                    </Label>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full justify-start text-xs h-8"
+                                      onClick={() => {
+                                        setFileManagerSelections(prev => ({
+                                          ...prev,
+                                          [file.id]: { ...prev[file.id], selectingType: 'thumbnail' }
+                                        }));
+                                        setShowFileManagerDialog(true);
+                                      }}
+                                    >
+                                      {selections.thumbnail ? (
+                                        <span className="truncate">{selections.thumbnail.name}</span>
+                                      ) : (
+                                        'Select thumbnail'
+                                      )}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <Button
+                                variant="ghost"
+                                size="iconSm"
+                                onClick={() => {
+                                  setSelectedFiles(prev => prev.filter(f => f.id !== file.id));
+                                  setFileManagerSelections(prev => {
+                                    const newSelections = { ...prev };
+                                    delete newSelections[file.id];
+                                    return newSelections;
+                                  });
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </TabsContent>
+          </Tabs>
+          
           <DialogFooter className="border-t pt-4">
             <div className="flex-1 text-sm text-muted-foreground">
-              {selectedMediaIds.length} tracks selected
+              {assignMediaTab === 'existing' 
+                ? `${selectedMediaIds.length} tracks selected`
+                : `${selectedFiles.length} files selected`
+              }
             </div>
-            <Button variant="ghost" onClick={() => setShowAssignMediaDialog(false)}>
+            <Button variant="ghost" onClick={() => {
+              setShowAssignMediaDialog(false);
+              setAssignMediaTab('existing');
+              setSelectedFiles([]);
+              setFileManagerSelections({});
+            }}>
               Cancel
             </Button>
-            <Button onClick={confirmAssignMedia} disabled={selectedMediaIds.length === 0 || addMediaToAlbumMutation.isPending}>
-              {addMediaToAlbumMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button 
+              onClick={assignMediaTab === 'existing' ? confirmAssignMedia : handleCreateMediaFromFiles}
+              disabled={
+                (assignMediaTab === 'existing' && selectedMediaIds.length === 0) ||
+                (assignMediaTab === 'file-manager' && selectedFiles.length === 0) ||
+                isCreatingMedia ||
+                addMediaToAlbumMutation.isPending
+              }
+            >
+              {(isCreatingMedia || addMediaToAlbumMutation.isPending) && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               <Check className="mr-2 h-4 w-4" />
-              Add to Album
+              {assignMediaTab === 'existing' ? 'Add to Album' : 'Create & Add to Album'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* File Picker Modal */}
+      <FilePickerModal
+        open={showFileManagerDialog}
+        onOpenChange={setShowFileManagerDialog}
+        onSelect={handleFileManagerSelect}
+        multiSelect={true}
+        allowedTypes={
+          // Determine allowed types based on what we're selecting
+          Object.values(fileManagerSelections).some(s => s?.selectingType === 'subtitle')
+            ? ['subtitle']
+            : Object.values(fileManagerSelections).some(s => s?.selectingType === 'thumbnail')
+            ? ['image']
+            : ['audio', 'video', 'hls']
+        }
+        title={
+          Object.values(fileManagerSelections).some(s => s?.selectingType === 'subtitle')
+            ? 'Select Subtitle File'
+            : Object.values(fileManagerSelections).some(s => s?.selectingType === 'thumbnail')
+            ? 'Select Thumbnail'
+            : 'Select Media Files'
+        }
+      />
 
       {/* Edit Artist Dialog */}
       <Dialog open={showEditArtistDialog} onOpenChange={setShowEditArtistDialog}>

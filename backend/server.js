@@ -129,6 +129,9 @@ app.use(artistsRoutes);
 const albumsRoutes = require('./routes/albums');
 app.use(albumsRoutes);
 
+const filesRoutes = require('./routes/files');
+app.use(filesRoutes);
+
 // Stubs
 const { checkAuth, checkAdminAuth } = require('./middleware');
 
