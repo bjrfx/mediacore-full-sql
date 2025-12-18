@@ -1406,9 +1406,12 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
     
     console.log('[UPDATE MEDIA] Update data:', updateData);
     
-    const updatedMedia = await mediaDAO.update(id, updateData);
+    await mediaDAO.update(id, updateData);
     
-    console.log('[UPDATE MEDIA] Updated successfully:', updatedMedia);
+    // Fetch updated media to return
+    const updatedMedia = await mediaDAO.getById(id);
+    
+    console.log('[UPDATE MEDIA] Updated successfully');
     
     res.json({
       success: true,
