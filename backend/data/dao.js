@@ -74,7 +74,6 @@ const mediaDAO = {
   async update(id, updates) {
     const allowedFields = {
       title: 'title',
-      subtitle: 'subtitle',
       description: 'description',
       artistId: 'artist_id',
       albumId: 'album_id',

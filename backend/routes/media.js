@@ -1383,9 +1383,9 @@ router.get('/admin/media', checkAdminAuth, async (req, res) => {
 router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, subtitle, description, artistId, albumId } = req.body;
+    const { title, description, artistId, albumId } = req.body;
     
-    console.log('[UPDATE MEDIA] Received update request:', { id, title, subtitle, description, artistId, albumId });
+    console.log('[UPDATE MEDIA] Received update request:', { id, title, description, artistId, albumId });
     
     const media = await mediaDAO.getById(id);
     
@@ -1399,7 +1399,6 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
     
     const updateData = {};
     if (title !== undefined) updateData.title = title;
-    if (subtitle !== undefined) updateData.subtitle = subtitle;
     if (description !== undefined) updateData.description = description;
     if (artistId !== undefined) updateData.artistId = artistId;
     if (albumId !== undefined) updateData.albumId = albumId;
