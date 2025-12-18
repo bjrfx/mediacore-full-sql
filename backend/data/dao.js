@@ -75,9 +75,22 @@ const mediaDAO = {
     const fields = [];
     const values = [];
     
+    // Mapping from camelCase API fields to snake_case database columns
+    const fieldMap = {
+      title: 'title',
+      subtitle: 'subtitle',
+      description: 'description',
+      artistId: 'artist_id',
+      albumId: 'album_id',
+      type: 'type',
+      language: 'language',
+      duration: 'duration',
+    };
+    
     Object.keys(updates).forEach(key => {
       if (updates[key] !== undefined) {
-        fields.push(`${key} = ?`);
+        const dbColumn = fieldMap[key] || key; // Use mapped column name or fallback to original
+        fields.push(`${dbColumn} = ?`);
         values.push(updates[key]);
       }
     });

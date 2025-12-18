@@ -93,14 +93,20 @@ export default function AdminMedia() {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => adminApi.updateMedia(id, data),
-    onSuccess: () => {
+    mutationFn: ({ id, data }) => {
+      console.log('[UPDATE MUTATION] Calling updateMedia with:', { id, data });
+      return adminApi.updateMedia(id, data);
+    },
+    onSuccess: (response) => {
+      console.log('[UPDATE MUTATION] Success:', response);
       queryClient.invalidateQueries(['media']);
+      queryClient.invalidateQueries(['admin-media']);
       setShowEditDialog(false);
       setEditingMedia(null);
       addToast({ message: 'Media updated successfully', type: 'success' });
     },
     onError: (error) => {
+      console.error('[UPDATE MUTATION] Error:', error);
       addToast({ message: error.message || 'Failed to update media', type: 'error' });
     },
   });
@@ -163,6 +169,8 @@ export default function AdminMedia() {
 
   const handleSaveEdit = async () => {
     if (editingMedia) {
+      console.log('[EDIT MEDIA] Saving with data:', editForm);
+      
       // First update the text fields
       updateMutation.mutate({
         id: editingMedia.id,
@@ -327,7 +335,7 @@ export default function AdminMedia() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium truncate">{media.title}</p>
-                        <p className="text-sm text-muted-foreground truncate">
+                        <p className="text-sm text-muted-foreground line-clamp-2">
                           {media.description || media.subtitle || 'No description'}
                         </p>
                       </div>
