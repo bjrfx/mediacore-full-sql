@@ -72,11 +72,7 @@ const mediaDAO = {
 
   // Update media
   async update(id, updates) {
-    const fields = [];
-    const values = [];
-    
-    // Mapping from camelCase API fields to snake_case database columns
-    const fieldMap = {
+    const allowedFields = {
       title: 'title',
       subtitle: 'subtitle',
       description: 'description',
@@ -87,21 +83,27 @@ const mediaDAO = {
       duration: 'duration',
     };
     
-    Object.keys(updates).forEach(key => {
-      if (updates[key] !== undefined) {
-        const dbColumn = fieldMap[key] || key; // Use mapped column name or fallback to original
-        fields.push(`${dbColumn} = ?`);
-        values.push(updates[key]);
+    const setClauses = [];
+    const params = [];
+    
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== undefined && allowedFields.hasOwnProperty(key)) {
+        const dbColumn = allowedFields[key];
+        setClauses.push(`${dbColumn} = ?`);
+        params.push(value);
       }
-    });
+    }
     
-    if (fields.length === 0) return false;
+    if (setClauses.length === 0) return false;
     
-    values.push(id);
-    await db.query(
-      `UPDATE media SET ${fields.join(', ')}, updated_at = NOW() WHERE id = ?`,
-      values
-    );
+    params.push(id);
+    const query = `UPDATE media SET ${setClauses.join(', ')}, updated_at = NOW() WHERE id = ?`;
+    
+    console.log('[DAO UPDATE] Executing query:', query);
+    console.log('[DAO UPDATE] With params:', params);
+    
+    const result = await db.query(query, params);
+    console.log('[DAO UPDATE] Result:', result);
     return true;
   },
 

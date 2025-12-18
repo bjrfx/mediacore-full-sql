@@ -1385,6 +1385,8 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
     const { id } = req.params;
     const { title, subtitle, description, artistId, albumId } = req.body;
     
+    console.log('[UPDATE MEDIA] Received update request:', { id, title, subtitle, description, artistId, albumId });
+    
     const media = await mediaDAO.getById(id);
     
     if (!media) {
@@ -1402,7 +1404,11 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
     if (artistId !== undefined) updateData.artistId = artistId;
     if (albumId !== undefined) updateData.albumId = albumId;
     
+    console.log('[UPDATE MEDIA] Update data:', updateData);
+    
     const updatedMedia = await mediaDAO.update(id, updateData);
+    
+    console.log('[UPDATE MEDIA] Updated successfully:', updatedMedia);
     
     res.json({
       success: true,
@@ -1411,11 +1417,11 @@ router.put('/admin/media/:id', checkAdminAuth, async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error updating media:', error);
+    console.error('[UPDATE MEDIA] Error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal Server Error',
-      message: 'Failed to update media'
+      message: error.message || 'Failed to update media'
     });
   }
 });
