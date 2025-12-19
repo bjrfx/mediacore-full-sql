@@ -13,8 +13,8 @@ const setupAdmin = async () => {
     console.log('🔧 Setting up admin user...');
     
     // Use a proper password that meets requirements: 8+ chars, uppercase, lowercase, number, special char
-    const adminPassword = 'Admin@MediaCore123!';
-    const adminEmail = 'admin@mediacore.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || '';
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@mediacore.com';
     const adminUid = uuidv4();
     
     // Hash password

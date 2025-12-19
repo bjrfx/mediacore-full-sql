@@ -22,6 +22,7 @@ import { useUIStore, useAuthStore, useLibraryStore } from '../../store';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../ui/tooltip';
+import { InstagramIcon, TwitterXIcon, YoutubeIcon } from '../SocialIcons';
 
 const mainNavItems = [
   { icon: Home, label: 'Home', path: '/' },
@@ -45,7 +46,7 @@ function Sidebar() {
 
   // Set sidebar collapsed by default on mount
   useEffect(() => {
-    setSidebarCollapsed(true);
+    setSidebarCollapsed(false);
   }, []); // Empty dependency array ensures this runs only once on mount
 
   const sidebarVariants = {
@@ -119,7 +120,8 @@ function Sidebar() {
           >
             <span style={{ color: '#E5E7EB' }}>Media</span>
             <span style={{ color: '#E5E7EB' }}>Core</span>
-            <span style={{ color: '#8B5CF6' }}>.in</span>
+            {/* <span style={{ color: '#8B5CF6' }}>.in</span> */}
+            <span style={{ color: '#5ec26a' }}>.in</span> 
           </motion.span>
         )}
         {isMobile && (
@@ -208,7 +210,7 @@ function Sidebar() {
 
       {/* Collapse button (desktop only) */}
       {!isMobile && (
-        <div className="px-2 pb-4 mt-5">
+        <div className="px-2 pb-4">
           <Button
             variant="ghost"
             size={collapsed ? 'icon' : 'default'}
@@ -226,6 +228,39 @@ function Sidebar() {
           </Button>
         </div>
       )}
+
+      {/* Social Icons */}
+      <div className={cn("flex items-center justify-center gap-2.5 px-4 py-4 border-t border-border", collapsed && "flex-col")}>
+        <a
+          href="https://www.instagram.com/mediacore_app"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Instagram"
+          className="text-gray-400 hover:text-orange-500 transition-colors p-2 rounded-full hover:bg-white/5"
+        >
+          <InstagramIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
+        </a>
+
+        <a
+          href="https://x.com/mediacore_app"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="X"
+          className="text-gray-400 hover:text-blue-400 transition-colors p-2 rounded-full hover:bg-white/5"
+        >
+          <TwitterXIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
+        </a>
+
+        <a
+          href="https://www.youtube.com/channel/UCzWTJPHliULme0kC2reNhLg"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="YouTube"
+          className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-white/5"
+        >
+          <YoutubeIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
+        </a>
+      </div>
     </div>
   );
 
