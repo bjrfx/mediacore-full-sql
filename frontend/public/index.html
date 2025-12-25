@@ -34,13 +34,11 @@
   </head>
   <body class="dark">
     <style>
-      /* Static legal links visible without JS; minimal footprint */
+      /* Visible legal links - always shown per Google OAuth branding requirements */
       .legal-links{position:fixed;left:12px;bottom:12px;z-index:10;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);backdrop-filter:saturate(120%) blur(6px);padding:6px 8px;border-radius:10px;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;line-height:1;color:#c7c7c7}
       .legal-links a{color:#c7c7c7;text-decoration:none;margin-right:10px}
       .legal-links a:hover{color:#8b5cf6;text-decoration:underline}
       @media (max-width: 480px){.legal-links{left:8px;bottom:8px;padding:5px 7px;font-size:11px}}
-      /* App can hide links post-mount without affecting non-JS crawlers */
-      .hide-legal-links .legal-links{display:none !important}
     </style>
     <div class="legal-links" aria-label="Legal links">
       <a href="https://app.mediacore.in/privacy">Privacy Policy</a>

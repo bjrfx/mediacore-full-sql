@@ -177,11 +177,6 @@ function App() {
     return () => window.removeEventListener('show-video-player', handleShowVideo);
   }, []);
 
-  // Hide static legal links after app mounts to avoid duplicate UI
-  useEffect(() => {
-    document.body.classList.add('hide-legal-links');
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
