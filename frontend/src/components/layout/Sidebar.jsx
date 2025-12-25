@@ -237,40 +237,36 @@ function Sidebar() {
           </div>
         )}
 
-        {/* Legal links */}
-        <div className="px-2 pb-3">
-          <div className="rounded-lg border border-border/60 bg-white/5">
-            {legalNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <TooltipProvider key={item.path} delayDuration={0}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <NavLink
-                        to={item.path}
-                        onClick={closeMobileSidebar}
-                        className={cn(
-                          'flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:text-primary hover:bg-white/10 transition-colors',
-                          isActive && 'text-primary bg-white/10',
-                          collapsed && 'justify-center px-2'
-                        )}
-                      >
-                        <Icon className={cn('h-4 w-4 shrink-0', isActive && 'text-primary')} />
-                        {!collapsed && <span className="font-medium">{item.label}</span>}
-                      </NavLink>
-                    </TooltipTrigger>
-                    {collapsed && (
-                      <TooltipContent side="right">
-                        <p>{item.label}</p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
+        {/* Legal links (hidden when collapsed) */}
+        {!collapsed && (
+          <div className="px-2 pb-3">
+            <div className="rounded-lg border border-border/60 bg-white/5">
+              {legalNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <TooltipProvider key={item.path} delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <NavLink
+                          to={item.path}
+                          onClick={closeMobileSidebar}
+                          className={cn(
+                            'flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:text-primary hover:bg-white/10 transition-colors',
+                            isActive && 'text-primary bg-white/10'
+                          )}
+                        >
+                          <Icon className={cn('h-4 w-4 shrink-0', isActive && 'text-primary')} />
+                          <span className="font-medium">{item.label}</span>
+                        </NavLink>
+                      </TooltipTrigger>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Social Icons */}
         <div className={cn("flex items-center justify-center gap-2.5 px-4 py-4 border-t border-border", collapsed && "flex-col")}> 

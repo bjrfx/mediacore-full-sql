@@ -39,6 +39,8 @@
       .legal-links a{color:#c7c7c7;text-decoration:none;margin-right:10px}
       .legal-links a:hover{color:#8b5cf6;text-decoration:underline}
       @media (max-width: 480px){.legal-links{left:8px;bottom:8px;padding:5px 7px;font-size:11px}}
+      /* App can hide links post-mount without affecting non-JS crawlers */
+      .hide-legal-links .legal-links{display:none !important}
     </style>
     <div class="legal-links" aria-label="Legal links">
       <a href="/privacy">Privacy Policy</a>
