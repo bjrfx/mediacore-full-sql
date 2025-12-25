@@ -16,6 +16,8 @@ import {
   Users,
   Download,
   User,
+  Shield,
+  FileText,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useUIStore, useAuthStore, useLibraryStore } from '../../store';
@@ -36,6 +38,11 @@ const libraryItems = [
   { icon: Heart, label: 'Favorites', path: '/liked' },
   { icon: Download, label: 'Downloads', path: '/downloads', requiresAuth: true },
   { icon: Clock, label: 'History', path: '/history' },
+];
+
+const legalNavItems = [
+  { icon: Shield, label: 'Privacy Policy', path: '/privacy' },
+  { icon: FileText, label: 'Terms of Service', path: '/terms' },
 ];
 
 function Sidebar() {
@@ -208,58 +215,95 @@ function Sidebar() {
         />
       </div> */}
 
-      {/* Collapse button (desktop only) */}
-      {!isMobile && (
-        <div className="px-2 pb-4">
-          <Button
-            variant="ghost"
-            size={collapsed ? 'icon' : 'default'}
-            onClick={() => setSidebarCollapsed(!collapsed)}
-            className={cn('w-full', collapsed && 'justify-center')}
-          >
-            {collapsed ? (
-              <ChevronRight className="h-5 w-5" />
-            ) : (
-              <>
-                <ChevronLeft className="h-5 w-5 mr-2" />
-                Collapse
-              </>
-            )}
-          </Button>
+      <div className="mt-auto">
+        {/* Collapse button (desktop only) */}
+        {!isMobile && (
+          <div className="px-2 pb-4">
+            <Button
+              variant="ghost"
+              size={collapsed ? 'icon' : 'default'}
+              onClick={() => setSidebarCollapsed(!collapsed)}
+              className={cn('w-full', collapsed && 'justify-center')}
+            >
+              {collapsed ? (
+                <ChevronRight className="h-5 w-5" />
+              ) : (
+                <>
+                  <ChevronLeft className="h-5 w-5 mr-2" />
+                  Collapse
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
+        {/* Legal links */}
+        <div className="px-2 pb-3">
+          <div className="rounded-lg border border-border/60 bg-white/5">
+            {legalNavItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <TooltipProvider key={item.path} delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <NavLink
+                        to={item.path}
+                        onClick={closeMobileSidebar}
+                        className={cn(
+                          'flex items-center gap-2 rounded-md px-3 py-2 text-xs text-muted-foreground hover:text-primary hover:bg-white/10 transition-colors',
+                          isActive && 'text-primary bg-white/10',
+                          collapsed && 'justify-center px-2'
+                        )}
+                      >
+                        <Icon className={cn('h-4 w-4 shrink-0', isActive && 'text-primary')} />
+                        {!collapsed && <span className="font-medium">{item.label}</span>}
+                      </NavLink>
+                    </TooltipTrigger>
+                    {collapsed && (
+                      <TooltipContent side="right">
+                        <p>{item.label}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
+          </div>
         </div>
-      )}
 
-      {/* Social Icons */}
-      <div className={cn("flex items-center justify-center gap-2.5 px-4 py-4 border-t border-border", collapsed && "flex-col")}>
-        <a
-          href="https://www.instagram.com/mediacore_app"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Instagram"
-          className="text-gray-400 hover:text-orange-500 transition-colors p-2 rounded-full hover:bg-white/5"
-        >
-          <InstagramIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
-        </a>
+        {/* Social Icons */}
+        <div className={cn("flex items-center justify-center gap-2.5 px-4 py-4 border-t border-border", collapsed && "flex-col")}> 
+          <a
+            href="https://www.instagram.com/mediacore_app"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="text-gray-400 hover:text-orange-500 transition-colors p-2 rounded-full hover:bg-white/5"
+          >
+            <InstagramIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
+          </a>
 
-        <a
-          href="https://x.com/mediacore_app"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="X"
-          className="text-gray-400 hover:text-blue-400 transition-colors p-2 rounded-full hover:bg-white/5"
-        >
-          <TwitterXIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
-        </a>
+          <a
+            href="https://x.com/mediacore_app"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="X"
+            className="text-gray-400 hover:text-blue-400 transition-colors p-2 rounded-full hover:bg-white/5"
+          >
+            <TwitterXIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
+          </a>
 
-        <a
-          href="https://www.youtube.com/channel/UCzWTJPHliULme0kC2reNhLg"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="YouTube"
-          className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-white/5"
-        >
-          <YoutubeIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
-        </a>
+          <a
+            href="https://www.youtube.com/channel/UCzWTJPHliULme0kC2reNhLg"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="YouTube"
+            className="text-gray-400 hover:text-red-500 transition-colors p-2 rounded-full hover:bg-white/5"
+          >
+            <YoutubeIcon className={cn("transition-all", collapsed ? "w-6 h-6" : "w-10 h-10")} />
+          </a>
+        </div>
       </div>
     </div>
   );
