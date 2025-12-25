@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Settings as SettingsIcon, Palette, Bell, Shield, Download, Info, Trash2, RefreshCw, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Bell, Shield, Download, Info, Trash2, RefreshCw, Database, ArrowUpRight } from 'lucide-react';
 import { publicApi, userApi } from '../services/api';
 import { useAuthStore, useUIStore } from '../store';
 import useSubscriptionStore from '../store/subscriptionStore';
@@ -342,6 +343,20 @@ export default function Settings() {
                 <p className="pt-4">
                   MediaCore - Premium Audio & Video Streaming Platform
                 </p>
+                <div className="pt-3 flex flex-wrap gap-3">
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/privacy" className="inline-flex items-center gap-2">
+                      Privacy Policy
+                      <ArrowUpRight className="w-4 h-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link to="/terms" className="inline-flex items-center gap-2">
+                      Terms of Service
+                      <ArrowUpRight className="w-4 h-4" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

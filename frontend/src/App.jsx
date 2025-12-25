@@ -34,6 +34,8 @@ const AlbumPage = lazy(() => import('./pages/AlbumPage'));
 const ArtistsPage = lazy(() => import('./pages/ArtistsPage'));
 const Downloads = lazy(() => import('./pages/Downloads'));
 const Profile = lazy(() => import('./pages/Profile'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 
 // Public shareable pages
 const PublicMediaPage = lazy(() => import('./pages/PublicMediaPage'));
@@ -116,6 +118,8 @@ function AppRoutes() {
             <Route path="downloads" element={<Downloads />} />
             <Route path="history" element={<History />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="privacy" element={<PrivacyPolicy />} />
+            <Route path="terms" element={<TermsOfService />} />
             <Route path="profile" element={<Profile />} />
             <Route path="play/:id" element={<MediaPlayer />} />
           </Route>
