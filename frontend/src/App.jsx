@@ -9,6 +9,7 @@ import { MainLayout } from './components/layout';
 
 // Auth components
 import { LoginModal, ProtectedRoute } from './components/auth';
+import SetPasswordModal from './components/auth/SetPasswordModal';
 
 // Player
 import { VideoPlayer } from './components/player';
@@ -150,14 +151,20 @@ function AppRoutes() {
 
 // Main App component
 function App() {
-  const { initAuth } = useAuthStore();
+  const { initAuth, needsPassword } = useAuthStore();
   const { modals, closeModal } = useUIStore();
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
 
   // Initialize auth state on mount
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  // Show password modal when Google user needs to set password
+  useEffect(() => {
+    setShowSetPasswordModal(needsPassword);
+  }, [needsPassword]);
 
   // Listen for video player trigger
   useEffect(() => {
@@ -177,6 +184,12 @@ function App() {
             <LoginModal
               open={modals.login}
               onOpenChange={(open) => !open && closeModal('login')}
+            />
+
+            {/* Set Password Modal (for Google users) */}
+            <SetPasswordModal
+              open={showSetPasswordModal}
+              onOpenChange={setShowSetPasswordModal}
             />
 
             {/* Video Player */}

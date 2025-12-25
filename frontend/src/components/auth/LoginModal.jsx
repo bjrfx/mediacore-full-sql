@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../../store';
 import { Loader2, AlertCircle, Mail, Lock, User, CheckCircle, Copy } from 'lucide-react';
 import {
@@ -23,7 +24,7 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
   const [success, setSuccess] = useState(null);
   const [copiedField, setCopiedField] = useState(null);
   
-  const { login } = useAuthStore();
+  const { login, googleLogin } = useAuthStore();
 
   const copyToClipboard = async (text, field) => {
     try {
@@ -127,6 +128,26 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
       setMode('login');
     }
     onOpenChange(isOpen);
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await googleLogin(credentialResponse.credential);
+      onOpenChange(false);
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError(err.message || 'Failed to sign in with Google');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google sign-in was cancelled or failed');
   };
 
   const toggleMode = () => {
@@ -262,6 +283,31 @@ export default function LoginModal({ open, onOpenChange, mode: initialMode = 'lo
               isSignUpMode ? 'Create Account' : 'Sign In'
             )}
           </Button>
+
+          {/* Divider */}
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          {/* Google Sign-In Button */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap={false}
+              size="large"
+              width="100%"
+              text={isSignUpMode ? "signup_with" : "signin_with"}
+              theme="outline"
+            />
+          </div>
 
           {/* Mode toggle */}
           <div className="text-center">

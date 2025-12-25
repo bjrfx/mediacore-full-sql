@@ -13,9 +13,13 @@
 
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const { query, queryOne, transaction } = require('../config/db');
 const { hashPassword, comparePassword, validatePassword } = require('./password');
 const { generateTokenPair, verifyToken, JWT_REFRESH_EXPIRY } = require('./jwt');
+
+// Initialize Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * POST /auth/register
@@ -239,15 +243,147 @@ const googleAuth = async (req, res) => {
       });
     }
 
-    // TODO: Verify Google token with Google API
-    // For now, we'll need to implement Google OAuth verification
-    // This requires the google-auth-library package
+    // Verify Google token
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken: googleToken,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+    } catch (error) {
+      console.error('Google token verification failed:', error);
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Invalid Google token'
+      });
+    }
 
-    // Placeholder response
-    res.status(501).json({
-      success: false,
-      error: 'Not Implemented',
-      message: 'Google OAuth is not yet implemented. Please use email/password login.'
+    const payload = ticket.getPayload();
+    const {
+      sub: googleId,
+      email,
+      name: displayName,
+      picture: photoURL,
+      email_verified: googleEmailVerified
+    } = payload;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Email not provided by Google'
+      });
+    }
+
+    // Check if user exists by google_id or email
+    let user = await queryOne(
+      'SELECT * FROM users WHERE google_id = ? OR email = ?',
+      [googleId, email]
+    );
+
+    let isNewUser = false;
+    let needsPassword = false;
+
+    if (!user) {
+      // Create new user with Google account
+      const uid = uuidv4();
+      
+      // Use empty string for password_hash (Google users don't have password initially)
+      await query(
+        `INSERT INTO users (uid, email, google_id, display_name, photo_url, email_verified, password_hash)
+         VALUES (?, ?, ?, ?, ?, ?, '')`,
+        [uid, email, googleId, displayName || null, photoURL || null, googleEmailVerified || false]
+      );
+
+      // Create default user role
+      await query(
+        'INSERT INTO user_roles (uid, role) VALUES (?, ?)',
+        [uid, 'user']
+      );
+
+      // Create default subscription
+      await query(
+        'INSERT INTO user_subscriptions (uid, subscription_tier) VALUES (?, ?)',
+        [uid, 'free']
+      );
+
+      // Fetch the newly created user
+      user = await queryOne('SELECT * FROM users WHERE uid = ?', [uid]);
+      isNewUser = true;
+      needsPassword = true;
+    } else if (!user.google_id) {
+      // Existing email/password user signing in with Google - link accounts
+      await query(
+        'UPDATE users SET google_id = ?, photo_url = COALESCE(photo_url, ?), email_verified = TRUE WHERE uid = ?',
+        [googleId, photoURL || null, user.uid]
+      );
+      
+      // Refresh user data
+      user = await queryOne('SELECT * FROM users WHERE uid = ?', [user.uid]);
+      needsPassword = false; // Already has password
+    } else {
+      // Existing Google user
+      // Update photo URL if changed
+      await query(
+        'UPDATE users SET photo_url = COALESCE(?, photo_url) WHERE uid = ?',
+        [photoURL || null, user.uid]
+      );
+      
+      // Check if user has set a password (password_hash is not empty)
+      needsPassword = !user.password_hash || user.password_hash === '';
+    }
+
+    // Check if user is disabled
+    if (user.disabled) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'Account has been disabled'
+      });
+    }
+
+    // Update last sign in time
+    await query(
+      'UPDATE users SET last_sign_in_at = NOW() WHERE uid = ?',
+      [user.uid]
+    );
+
+    // Get user role
+    const roleRecord = await queryOne(
+      'SELECT role FROM user_roles WHERE uid = ?',
+      [user.uid]
+    );
+    const userRole = roleRecord ? roleRecord.role : 'user';
+
+    // Generate tokens
+    const tokens = generateTokenPair(user);
+
+    // Store refresh token
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    await query(
+      'INSERT INTO refresh_tokens (token, uid, expires_at) VALUES (?, ?, ?)',
+      [tokens.refreshToken, user.uid, expiresAt]
+    );
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Account created successfully with Google' : 'Login successful',
+      data: {
+        user: {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.display_name,
+          photoURL: user.photo_url,
+          emailVerified: user.email_verified,
+          role: userRole,
+          hasPassword: !needsPassword,
+          isNewUser
+        },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        needsPassword // Flag to show password setup modal
+      }
     });
   } catch (error) {
     console.error('Google auth error:', error);
@@ -605,6 +741,75 @@ const verifyEmail = async (req, res) => {
   }
 };
 
+/**
+ * POST /auth/set-password
+ * Set password for Google OAuth users (requires authentication)
+ */
+const setPassword = async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    const uid = req.user.uid; // From checkAuth middleware
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'New password is required'
+      });
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Password does not meet requirements',
+        errors: passwordValidation.errors
+      });
+    }
+
+    // Get user to verify they exist and check current password status
+    const user = await queryOne('SELECT uid, password_hash, google_id FROM users WHERE uid = ?', [uid]);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'User not found'
+      });
+    }
+
+    // Optional: Allow only Google users without password to use this endpoint initially
+    // Remove this check if you want all users to be able to change password via this endpoint
+    if (user.password_hash && user.password_hash !== '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Bad Request',
+        message: 'Password already set. Use forgot password to reset it.'
+      });
+    }
+
+    // Hash new password
+    const passwordHash = await hashPassword(newPassword);
+
+    // Update password
+    await query('UPDATE users SET password_hash = ? WHERE uid = ?', [passwordHash, uid]);
+
+    res.json({
+      success: true,
+      message: 'Password set successfully. You can now sign in with email and password.'
+    });
+  } catch (error) {
+    console.error('Set password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal Server Error',
+      message: 'Failed to set password'
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -614,5 +819,6 @@ module.exports = {
   getCurrentUser,
   forgotPassword,
   resetPassword,
-  verifyEmail
+  verifyEmail,
+  setPassword
 };

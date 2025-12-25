@@ -10,6 +10,7 @@ const useAuthStore = create(
       isAuthenticated: false,
       isAdminUser: false,
       error: null,
+      needsPassword: false, // Track if Google user needs to set password
 
       /**
        * Login with email/password
@@ -26,7 +27,8 @@ const useAuthStore = create(
             user: data.user,
             isAuthenticated: true,
             isAdminUser: isAdmin,
-            isLoading: false
+            isLoading: false,
+            needsPassword: false
           });
           
           return data;
@@ -38,6 +40,71 @@ const useAuthStore = create(
           });
           throw error;
         }
+      },
+
+      /**
+       * Login with Google OAuth
+       */
+      googleLogin: async (googleToken) => {
+        set({ isLoading: true, error: null });
+        try {
+          const data = await authService.googleLogin(googleToken);
+          
+          const isAdmin = data.user.role === 'admin' || 
+                         data.user.email === process.env.REACT_APP_ADMIN_EMAIL;
+          
+          set({
+            user: data.user,
+            isAuthenticated: true,
+            isAdminUser: isAdmin,
+            isLoading: false,
+            needsPassword: data.needsPassword || false
+          });
+          
+          return data;
+        } catch (error) {
+          set({ 
+            error: error.message, 
+            isLoading: false,
+            isAuthenticated: false 
+          });
+          throw error;
+        }
+      },
+
+      /**
+       * Set password for Google users
+       */
+      setPassword: async (newPassword) => {
+        set({ isLoading: true, error: null });
+        try {
+          await authService.setPassword(newPassword);
+          
+          // Update user state to reflect password is now set
+          const currentUser = get().user;
+          if (currentUser) {
+            set({
+              user: { ...currentUser, hasPassword: true },
+              needsPassword: false,
+              isLoading: false
+            });
+          }
+          
+          return { success: true };
+        } catch (error) {
+          set({ 
+            error: error.message, 
+            isLoading: false 
+          });
+          throw error;
+        }
+      },
+
+      /**
+       * Dismiss password prompt (user chose "Later")
+       */
+      dismissPasswordPrompt: () => {
+        set({ needsPassword: false });
       },
 
       /**
@@ -123,6 +190,7 @@ const useAuthStore = create(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         isAdminUser: state.isAdminUser,
+        // Don't persist needsPassword - it should be fresh on each session
       }),
     }
   )

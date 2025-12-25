@@ -188,10 +188,61 @@ export const authService = {
     }
     
     return data;
+  },
+
+  /**
+   * Login with Google OAuth
+   */
+  googleLogin: async (googleToken) => {
+    const response = await fetch(`${API_BASE_URL}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ googleToken })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Google login failed');
+    }
+    
+    // Store tokens
+    localStorage.setItem('accessToken', data.data.accessToken);
+    localStorage.setItem('refreshToken', data.data.refreshToken);
+    
+    return data.data;
+  },
+
+  /**
+   * Set password for Google OAuth users
+   */
+  setPassword: async (newPassword) => {
+    const accessToken = localStorage.getItem('accessToken');
+    
+    if (!accessToken) {
+      throw new Error('No access token');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/auth/set-password`, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ newPassword })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to set password');
+    }
+    
+    return data;
   }
 };
 
 // Export individual functions for convenience
-export const { login, register, refreshToken, logout, getCurrentUser, forgotPassword, resetPassword } = authService;
+export const { login, register, refreshToken, logout, getCurrentUser, forgotPassword, resetPassword, googleLogin, setPassword } = authService;
 
 export default authService;
